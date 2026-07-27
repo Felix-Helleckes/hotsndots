@@ -1,0 +1,14 @@
+# Configuration for the CurseForge / BigWigs packager
+# https://addons.wowinterface.com/pkgmeta.html
+
+package-as: DotsNHots
+
+enable-nolib-creation: no
+
+# This addon uses NO external libraries -> no "externals" needed.
+
+# Files that should NOT go into the release zip:
+ignore:
+  - CURSEFORGE.md
+  - .git
+  - .github
