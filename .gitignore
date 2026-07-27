@@ -1,0 +1,8 @@
+# Build artifact - regenerate with build.ps1 (or let the packager build it on tag)
+DotsNHots.zip
+
+# Local/editor noise
+*.bak
+*.tmp
+Thumbs.db
+.DS_Store

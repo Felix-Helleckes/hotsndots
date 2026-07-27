@@ -34,22 +34,26 @@ local function CreateBar(i)
     bar.iconBorder:SetPoint("BOTTOMRIGHT", bar.icon, "BOTTOMRIGHT", 1.5, -1.5)
     bar.iconBorder:SetColorTexture(0, 0, 0, 1)
 
-    bar.name = bar:CreateFontString(nil, "OVERLAY")
-    bar.name:SetPoint("LEFT", 5, 0)
-    bar.name:SetPoint("RIGHT", bar, "RIGHT", -40, 0)
-    bar.name:SetJustifyH("LEFT")
-    bar.name:SetWordWrap(false)
-    bar.name:SetFont(STANDARD_TEXT_FONT, cfg.fontSize, "OUTLINE")
-
-    -- countdown NUMBER at the right end via a Cooldown frame. This renders
-    -- Blizzard's built-in localized number (e.g. "10"), because secret aura
-    -- times can't be formatted into text ourselves. No swipe here.
+    -- countdown NUMBER at the far right of the bar, via a Cooldown frame.
+    -- This renders Blizzard's built-in localized number (e.g. "10"), because
+    -- secret aura times can't be formatted into text ourselves. No swipe here.
+    -- The number is drawn centered inside this frame, so the frame itself is
+    -- the reserved "time column" at the right edge of the bar.
     bar.timeCD = CreateFrame("Cooldown", nil, bar, "CooldownFrameTemplate")
-    bar.timeCD:SetPoint("RIGHT", bar, "RIGHT", -3, 0)
-    bar.timeCD:SetSize(cfg.height, cfg.height)
+    bar.timeCD:SetPoint("RIGHT", bar, "RIGHT", -2, 0)
+    bar.timeCD:SetSize(math.max(34, cfg.height), cfg.height)
     bar.timeCD:SetDrawSwipe(false)
     bar.timeCD:SetDrawEdge(false)
     bar.timeCD:SetHideCountdownNumbers(false)
+
+    -- Name fills the space LEFT of the time column and is anchored to it, so
+    -- the two can never overlap regardless of bar width or font size.
+    bar.name = bar:CreateFontString(nil, "OVERLAY")
+    bar.name:SetPoint("LEFT", bar, "LEFT", 5, 0)
+    bar.name:SetPoint("RIGHT", bar.timeCD, "LEFT", -2, 0)
+    bar.name:SetJustifyH("LEFT")
+    bar.name:SetWordWrap(false)
+    bar.name:SetFont(STANDARD_TEXT_FONT, cfg.fontSize, "OUTLINE")
 
     bar.durset = ns.CreateDurationSet()
 
@@ -107,7 +111,7 @@ function ns.Bars_Update()
 
         bar:SetSize(cfg.width, cfg.height)
         bar.icon:SetSize(cfg.height, cfg.height)
-        bar.timeCD:SetSize(cfg.height, cfg.height)
+        bar.timeCD:SetSize(math.max(34, cfg.height), cfg.height)
         bar.name:SetFont(STANDARD_TEXT_FONT, cfg.fontSize, "OUTLINE")
 
         -- icon + name (secrets -> pass straight through)

@@ -1,5 +1,9 @@
 # Configuration for the CurseForge / BigWigs packager
 # https://addons.wowinterface.com/pkgmeta.html
+#
+# Repo layout: the addon files live at the REPOSITORY ROOT.
+# The packager wraps them into a folder named by "package-as" (DotsNHots/),
+# which is exactly what WoW and CurseForge expect.
 
 package-as: DotsNHots
 
@@ -10,5 +14,9 @@ enable-nolib-creation: no
 # Files that should NOT go into the release zip:
 ignore:
   - CURSEFORGE.md
+  - DotsNHots-logo.png
+  - DotsNHots.zip
+  - build.ps1
   - .git
   - .github
+  - .gitignore
