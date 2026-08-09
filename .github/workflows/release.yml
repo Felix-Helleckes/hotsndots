@@ -8,9 +8,16 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Needed so the packager can create the GitHub Release. Without it the
+    # default GITHUB_TOKEN is read-only and the release step fails with
+    # 403 "Resource not accessible by integration".
+    permissions:
+      contents: write
     steps:
       - name: Clone project
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the packager reads tags to build the changelog
 
       - name: Package and release
         uses: BigWigsMods/packager@v2
