@@ -2,10 +2,10 @@
 # https://addons.wowinterface.com/pkgmeta.html
 #
 # Repo layout: the addon files live at the REPOSITORY ROOT.
-# The packager wraps them into a folder named by "package-as" (DotsNHots/),
+# The packager wraps them into a folder named by "package-as" (HotsNDots/),
 # which is exactly what WoW and CurseForge expect.
 
-package-as: DotsNHots
+package-as: HotsNDots
 
 enable-nolib-creation: no
 
@@ -14,8 +14,8 @@ enable-nolib-creation: no
 # Files that should NOT go into the release zip:
 ignore:
   - CURSEFORGE.md
-  - DotsNHots-logo.png
-  - DotsNHots.zip
+  - HotsNDots-logo.png
+  - HotsNDots.zip
   - build.ps1
   - .git
   - .github

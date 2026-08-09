@@ -1,5 +1,5 @@
 # Build artifact - regenerate with build.ps1 (or let the packager build it on tag)
-DotsNHots.zip
+HotsNDots.zip
 
 # Local/editor noise
 *.bak

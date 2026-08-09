@@ -1,7 +1,7 @@
-# Builds DotsNHots.zip for a manual CurseForge upload.
+# Builds HotsNDots.zip for a manual CurseForge upload.
 #
 # The addon files live at the repo root, but WoW/CurseForge need a zip whose
-# top level is a single "DotsNHots" folder. This script stages the shipped
+# top level is a single "HotsNDots" folder. This script stages the shipped
 # files into that folder and zips it. Mirrors the ignore list in .pkgmeta.
 #
 # Usage:  pwsh -File build.ps1     (or right-click > Run with PowerShell)
@@ -9,14 +9,14 @@
 $ErrorActionPreference = 'Stop'
 
 $root    = $PSScriptRoot
-$name    = 'DotsNHots'
+$name    = 'HotsNDots'
 $zipPath = Join-Path $root "$name.zip"
-$staging = Join-Path ([System.IO.Path]::GetTempPath()) ("dnh_build_" + [Guid]::NewGuid().ToString('N'))
+$staging = Join-Path ([System.IO.Path]::GetTempPath()) ("hnd_build_" + [Guid]::NewGuid().ToString('N'))
 $dest    = Join-Path $staging $name
 
 # Files that ship inside the addon folder
 $include = @(
-    'DotsNHots.toc',
+    'HotsNDots.toc',
     'Core.lua',
     'Nameplates.lua',
     'Bars.lua',

@@ -1,7 +1,11 @@
 --=====================================================================
---  DotsNHots - Nameplates  (Midnight 12.0 "Secret Values" compliant)
+--  HotsNDots - Nameplates  (Midnight 12.0 "Secret Values" compliant)
 --  Shows your own auras large above the nameplate:
---  icon + cooldown swipe + Blizzard's built-in seconds number + stacks.
+--  icon + cooldown swipe + big seconds countdown + real stacks.
+--
+--  The seconds are drawn by a second, swipe-less Cooldown frame sitting
+--  above the icon: Blizzard's built-in countdown is the only text that
+--  may still display a secret remaining time.
 --=====================================================================
 
 local ADDON_NAME, ns = ...
@@ -26,35 +30,42 @@ local function CreateIcon(parent)
     b.icon:SetAllPoints()
     b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    -- The cooldown frame shows Blizzard's own built-in countdown NUMBER on the
-    -- icon (localized short form like "10"), exactly like the default nameplate
-    -- auras - plus the optional swipe.
+    -- swipe only - its own countdown text stays off
     b.cooldown = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
     b.cooldown:SetAllPoints()
     b.cooldown:SetDrawEdge(false)
-    b.cooldown:SetHideCountdownNumbers(false) -- show Blizzard's built-in seconds
+    b.cooldown:SetHideCountdownNumbers(true)
     b.cooldown:SetReverse(true)
+    b.cooldown:EnableMouse(false)
+    b.cooldown.noCooldownCount = true
+
+    -- big seconds above the icon (Blizzard's built-in countdown number)
+    b.timeCD = ns.CreateTimerText(b)
+    b.timeCD:SetPoint("BOTTOM", b, "TOP", 0, 0)
+    b.timer = ns.GetCountdownFontString(b.timeCD)
+    if b.timer then
+        b.timer:ClearAllPoints()
+        b.timer:SetPoint("CENTER", b.timeCD, "CENTER", 0, 0)
+        b.timer:SetJustifyH("CENTER")
+    end
 
     -- stack count in the bottom-right corner
-    b.count = b:CreateFontString(nil, "OVERLAY")
+    b.count = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     b.count:SetPoint("BOTTOMRIGHT", 2, -2)
-    b.count:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE")
+    ns.SetFont(b.count, 12)
     b.count:SetTextColor(1, 1, 1)
-
-    -- reusable Duration object (drives the swipe + built-in numbers)
-    b.durset = ns.CreateDurationSet()
 
     return b
 end
 
 local function GetContainer(nameplate)
-    local c = nameplate.DotsNHots
+    local c = nameplate.HotsNDots
     if not c then
         c = CreateFrame("Frame", nil, nameplate)
         c:SetFrameStrata("HIGH")
         c:SetSize(1, 1)
         c.icons = {}
-        nameplate.DotsNHots = c
+        nameplate.HotsNDots = c
     end
     return c
 end
@@ -68,27 +79,108 @@ local function GetIcon(c, i)
     return ic
 end
 
+local function HideIcon(ic)
+    -- always wipe the timer state too, otherwise a recycled icon keeps
+    -- showing the previous aura's countdown
+    ic.cooldown:Clear()
+    ic.timeCD:Clear()
+    ic:Hide()
+end
+
 --------------------------------------------------------------------
 -- Hide / replace the default Blizzard nameplate auras
+--  Our icons ALWAYS replace the default ones - there is no point in
+--  drawing both. The container is not called the same thing on every
+--  build, so find it instead of hard-coding a field name.
 --------------------------------------------------------------------
-local function ApplyBlizzardVisibility(np)
+local AURA_CONTAINER_KEYS = {
+    "BuffFrame", "buffFrame", "AuraFrame", "AurasFrame",
+    "Auras", "BuffContainer", "AuraContainer", "DebuffFrame",
+}
+
+local function FindBlizzardAuraFrame(np)
     local uf = np and np.UnitFrame
-    local bf = uf and uf.BuffFrame
+    if not uf then return nil end
+
+    -- cached per unit frame; `false` means "looked, found nothing"
+    if uf.hndAuraFrame ~= nil then
+        return uf.hndAuraFrame or nil
+    end
+
+    local found, foundKey
+    for _, key in ipairs(AURA_CONTAINER_KEYS) do
+        local f = rawget(uf, key)
+        if type(f) == "table" and type(f.Hide) == "function" and type(f.SetAlpha) == "function" then
+            found, foundKey = f, key
+            break
+        end
+    end
+
+    if not found and uf.GetChildren then
+        -- fall back to a child frame that names itself after buffs/auras
+        for _, child in ipairs({ uf:GetChildren() }) do
+            local n = child.GetName and child:GetName()
+            if n and (n:find("Buff") or n:find("Aura")) then
+                found, foundKey = child, n
+                break
+            end
+        end
+    end
+
+    uf.hndAuraFrame = found or false
+    uf.hndAuraFrameKey = foundKey
+    return found
+end
+
+-- /hnd debug: report what we actually found on this client, so a build
+-- that renamed the aura container can be identified without guessing.
+function ns.Nameplates_Debug()
+    local n = 0
+    for unit in pairs(plates) do
+        n = n + 1
+        local np = C_NamePlate.GetNamePlateForUnit(unit)
+        local uf = np and np.UnitFrame
+        if not uf then
+            print(ns.BRAND .. ": " .. unit .. " -> no UnitFrame (custom nameplate addon?)")
+        else
+            local bf = FindBlizzardAuraFrame(np)
+            if bf then
+                print(ns.BRAND .. ": " .. unit .. " -> default auras = '" ..
+                      tostring(uf.hndAuraFrameKey) .. "', shown = " .. tostring(bf:IsShown()))
+            else
+                local names = {}
+                for _, child in ipairs({ uf:GetChildren() }) do
+                    names[#names + 1] = tostring(child.GetName and child:GetName() or "<unnamed>")
+                end
+                print(ns.BRAND .. ": " .. unit .. " -> aura container NOT found. Children: " ..
+                      (table.concat(names, ", "):sub(1, 400)))
+            end
+        end
+    end
+    if n == 0 then
+        print(ns.BRAND .. ": no nameplates visible - target something first.")
+    end
+end
+
+local function ApplyBlizzardVisibility(np)
+    local bf = FindBlizzardAuraFrame(np)
     if not bf then return end
 
-    local shouldHide = ns.db.nameplates.hideBlizzard and ns.db.nameplates.enabled
-
-    -- one-time hook so it stays hidden when Blizzard tries to show it again
-    if not bf.__dnhHook then
-        bf.__dnhHook = true
-        bf:HookScript("OnShow", function(self)
-            if ns.db.nameplates.hideBlizzard and ns.db.nameplates.enabled then
+    -- One-time hook. HookScript("OnShow") alone was not enough: it only
+    -- fires on a hidden->shown transition, so a nameplate recycled with an
+    -- already-visible aura frame kept its default icons. Hooking Show()
+    -- itself catches every attempt, including the redundant ones.
+    if not bf.__hndHook then
+        bf.__hndHook = true
+        hooksecurefunc(bf, "Show", function(self)
+            if ns.db and ns.db.nameplates.enabled then
                 self:Hide()
+                self:SetAlpha(0)
             end
         end)
     end
 
-    if shouldHide then
+    if ns.db.nameplates.enabled then
         bf:Hide()
         bf:SetAlpha(0)
     else
@@ -114,12 +206,16 @@ local function RefreshUnit(unit)
 
     local cfg = ns.db.nameplates
     if not cfg.enabled then
-        for i = 1, #c.icons do c.icons[i]:Hide() end
+        for i = 1, #c.icons do HideIcon(c.icons[i]) end
         return
     end
 
     local np = C_NamePlate.GetNamePlateForUnit(unit)
     if not np then return end
+
+    -- self-healing: Blizzard re-shows its own auras on aura updates, so
+    -- re-assert on every refresh rather than only when the plate appears
+    ApplyBlizzardVisibility(np)
 
     local list = ns.ScanUnit(unit, scan)
     table.sort(list, ns.SortByInstanceID)
@@ -143,38 +239,40 @@ local function RefreshUnit(unit)
         ic:SetSize(size, size)
         ic:ClearAllPoints()
         ic:SetPoint("LEFT", c, "LEFT", (i - 1) * (size + spacing), 0)
-        ic:Show()
 
-        -- icon (secret -> pass straight through to the texture)
-        pcall(ic.icon.SetTexture, ic.icon, aura.icon)
+        -- icon (secret -> passed straight through to the texture)
+        ic.icon:SetTexture(aura.icon)
 
-        -- border color: red = debuff, green = buff/HoT (isHarmful is readable)
-        if aura.isHarmful then
+        -- border color: red = debuff, green = buff/HoT
+        if ns.IsHarmful(unit, aura) then
             ic.border:SetColorTexture(0.65, 0.1, 0.1, 1)
         else
             ic.border:SetColorTexture(0.1, 0.55, 0.15, 1)
         end
 
-        -- live stack font size
-        ic.count:SetFont(STANDARD_TEXT_FONT, cfg.stackFontSize, "OUTLINE")
+        -- remaining time: one live Duration object drives both the swipe
+        -- and the number, and both get cleared when there is no duration
+        local duration = ns.GetDuration(unit, aura)
 
-        -- remaining time via Duration object (only pass secrets through)
-        ns.UpdateDurationSet(ic.durset, aura)
-
-        -- drive the cooldown: shows Blizzard's built-in countdown NUMBER on the
-        -- icon (localized short form). The swipe is toggled separately.
-        if ic.durset.duration and ic.cooldown.SetCooldownFromDurationObject then
-            pcall(ic.cooldown.SetDrawSwipe, ic.cooldown, cfg.showSwipe and true or false)
-            pcall(ic.cooldown.SetCooldownFromDurationObject, ic.cooldown, ic.durset.duration)
-        else
-            ic.cooldown:Clear()
+        ic.timeCD:SetSize(math.max(size, cfg.timerFontSize * 2.2), cfg.timerFontSize * 1.4)
+        ns.ApplyCooldown(ic.timeCD, duration)
+        -- font goes on AFTER the cooldown starts: the engine picks a font
+        -- of its own when a countdown begins and would overwrite ours
+        if ic.timer then
+            ns.SetFont(ic.timer, cfg.timerFontSize)
+            ic.timer:SetTextColor(1, 1, 1)
         end
 
-        -- stacks (secret -> pass straight through to the FontString)
+        ic.cooldown:SetDrawSwipe(cfg.showSwipe and true or false)
+        ns.ApplyCooldown(ic.cooldown, cfg.showSwipe and duration or nil)
+
+        -- stacks: only real ones (2+), decided C-side so no secret is read
         if cfg.showStacks then
-            pcall(ic.count.SetText, ic.count, aura.applications)
+            ns.SetFont(ic.count, cfg.stackFontSize)
+            ns.SetStackText(ic.count, unit, aura)
             ic.count:Show()
         else
+            ic.count:SetText("")
             ic.count:Hide()
         end
 
@@ -182,7 +280,7 @@ local function RefreshUnit(unit)
     end
 
     for i = n + 1, #c.icons do
-        c.icons[i]:Hide()
+        HideIcon(c.icons[i])
     end
 end
 
@@ -202,7 +300,7 @@ end
 function ns.Nameplates_OnRemoved(unit)
     local c = plates[unit]
     if c then
-        for i = 1, #c.icons do c.icons[i]:Hide() end
+        for i = 1, #c.icons do HideIcon(c.icons[i]) end
         c.unit = nil
         plates[unit] = nil
     end

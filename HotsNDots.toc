@@ -1,16 +1,16 @@
 ## Interface: 120007
-## Title: |cff33ff99DotsNHots|r
+## Title: |cff33ff99HotsNDots|r
 ## Notes: Shows only YOUR own DoTs (on enemies) and HoTs/buffs (on friends) - large on nameplates with a seconds countdown, and as freely movable bars.
 ## Author: Florian
-## Version: 1.0.0
-## SavedVariables: DotsNHotsDB
-## IconTexture: Interface\AddOns\DotsNHots\Icon.tga
-## AddonCompartmentFunc: DotsNHots_OnCompartmentClick
-## AddonCompartmentFuncOnEnter: DotsNHots_OnCompartmentEnter
-## AddonCompartmentFuncOnLeave: DotsNHots_OnCompartmentLeave
+## Version: 1.1.1
+## SavedVariables: HotsNDotsDB
+## IconTexture: Interface\AddOns\HotsNDots\Icon.tga
+## AddonCompartmentFunc: HotsNDots_OnCompartmentClick
+## AddonCompartmentFuncOnEnter: HotsNDots_OnCompartmentEnter
+## AddonCompartmentFuncOnLeave: HotsNDots_OnCompartmentLeave
 ## X-Category: Buffs & Debuffs
 ## X-License: MIT
-## X-Website: https://www.curseforge.com/wow/addons/dotsnhots
+## X-Website: https://www.curseforge.com/wow/addons/hotsndots
 # ## X-Curse-Project-ID: 000000   (fill in after creating the CurseForge project)
 
 Core.lua

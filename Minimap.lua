@@ -1,5 +1,5 @@
 --=====================================================================
---  DotsNHots - Minimap Button
+--  HotsNDots - Minimap Button
 --  Self-contained minimap button (no external libraries), built with
 --  the standard LibDBIcon geometry so it sits on the ring exactly like
 --  every other addon button.
@@ -40,15 +40,80 @@ end
 -- Visibility
 --------------------------------------------------------------------
 function ns.Minimap_UpdateShown()
+    if ns.ldbIcon then
+        if ns.db.minimap.hide then
+            ns.ldbIcon:Hide(ns.name)
+        else
+            ns.ldbIcon:Show(ns.name)
+        end
+        return
+    end
     if not button then return end
     if ns.db.minimap.hide then button:Hide() else button:Show() end
+end
+
+--------------------------------------------------------------------
+-- LibDBIcon route
+--  Minimap-button managers (Leatrix Plus' button bag, ElvUI, MoveAny,
+--  ...) collect buttons through LibDBIcon's registry - a hand-rolled
+--  button parented to the Minimap is invisible to all of them, which is
+--  why HotsNDots never turned up in Leatrix' right-click bag.
+--  We do not ship the libraries (the addon stays dependency-free); we
+--  just use them when some other addon has already loaded them, and
+--  fall back to our own button otherwise.
+--------------------------------------------------------------------
+local function TryLibDBIcon()
+    if not LibStub then return false end
+
+    local LDB     = LibStub:GetLibrary("LibDataBroker-1.1", true)
+    local LDBIcon = LibStub:GetLibrary("LibDBIcon-1.0", true)
+    if not (LDB and LDBIcon) then return false end
+    if LDBIcon:GetMinimapButton(ns.name) then return true end -- already there
+
+    local obj = LDB:NewDataObject(ns.name, {
+        type = "launcher",
+        text = ns.name,
+        icon = "Interface\\AddOns\\HotsNDots\\Icon.tga",
+        OnClick = function(_, mouseButton)
+            if mouseButton == "RightButton" then
+                ns.db.bars.locked = not ns.db.bars.locked
+                ns.Bars_UpdateLock()
+                print(ns.BRAND .. ": bars " ..
+                    (ns.db.bars.locked and "locked." or "unlocked \226\128\147 drag to move."))
+            else
+                ns.OpenConfig()
+            end
+        end,
+        OnTooltipShow = function(tt)
+            tt:AddLine(ns.BRAND)
+            tt:AddLine("Left click: settings", 1, 1, 1)
+            tt:AddLine("Right click: lock/unlock bars", 1, 1, 1)
+            tt:AddLine("Drag: move this button", 1, 1, 1)
+        end,
+    })
+    if not obj then return false end
+
+    -- LibDBIcon owns db.hide and db.minimapPos; our own db.angle stays
+    -- untouched so the fallback button keeps its position too.
+    -- showInCompartment is deliberately NOT set: the .toc already
+    -- registers an Addon Compartment entry and we don't want two.
+    LDBIcon:Register(ns.name, obj, ns.db.minimap)
+
+    ns.ldbObject = obj
+    ns.ldbIcon = LDBIcon
+    return true
 end
 
 --------------------------------------------------------------------
 -- Create
 --------------------------------------------------------------------
 function ns.Minimap_Init()
-    button = CreateFrame("Button", "DotsNHotsMinimapButton", Minimap)
+    if TryLibDBIcon() then
+        ns.Minimap_UpdateShown()
+        return
+    end
+
+    button = CreateFrame("Button", "HotsNDotsMinimapButton", Minimap)
     button:SetFrameStrata("MEDIUM")
     button:SetSize(31, 31)
     button:SetFrameLevel(8)
@@ -61,10 +126,10 @@ function ns.Minimap_Init()
     overlay:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     overlay:SetPoint("TOPLEFT")
 
-    -- custom DotsNHots logo (self-contained TGA shipped with the addon)
+    -- custom HotsNDots logo (self-contained TGA shipped with the addon)
     local icon = button:CreateTexture(nil, "ARTWORK")
     icon:SetSize(19, 19)
-    icon:SetTexture("Interface\\AddOns\\DotsNHots\\Icon.tga")
+    icon:SetTexture("Interface\\AddOns\\HotsNDots\\Icon.tga")
     icon:SetTexCoord(0, 1, 0, 1)
     icon:SetPoint("CENTER", 0, 1)
 
@@ -72,7 +137,7 @@ function ns.Minimap_Init()
         if mouseButton == "RightButton" then
             ns.db.bars.locked = not ns.db.bars.locked
             ns.Bars_UpdateLock()
-            print("|cff33ff99DotsNHots|r: bars " ..
+            print("|cff33ff99HotsNDots|r: bars " ..
                 (ns.db.bars.locked and "locked." or "unlocked \226\128\147 drag to move."))
         else
             ns.OpenConfig()
@@ -88,7 +153,7 @@ function ns.Minimap_Init()
 
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("|cff33ff99DotsNHots|r")
+        GameTooltip:AddLine("|cff33ff99HotsNDots|r")
         GameTooltip:AddLine("Left click: settings", 1, 1, 1)
         GameTooltip:AddLine("Right click: lock/unlock bars", 1, 1, 1)
         GameTooltip:AddLine("Drag: move this button", 1, 1, 1)
@@ -104,17 +169,17 @@ end
 -- Native Addon Compartment integration (icon menu next to the minimap)
 -- Called via the .toc directives.
 --------------------------------------------------------------------
-function DotsNHots_OnCompartmentClick()
+function HotsNDots_OnCompartmentClick()
     ns.OpenConfig()
 end
 
-function DotsNHots_OnCompartmentEnter(_, menuButtonFrame)
+function HotsNDots_OnCompartmentEnter(_, menuButtonFrame)
     GameTooltip:SetOwner(menuButtonFrame, "ANCHOR_LEFT")
-    GameTooltip:AddLine("|cff33ff99DotsNHots|r")
+    GameTooltip:AddLine("|cff33ff99HotsNDots|r")
     GameTooltip:AddLine("Click: open settings", 1, 1, 1)
     GameTooltip:Show()
 end
 
-function DotsNHots_OnCompartmentLeave()
+function HotsNDots_OnCompartmentLeave()
     GameTooltip:Hide()
 end

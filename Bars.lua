@@ -1,13 +1,16 @@
 --=====================================================================
---  DotsNHots - Bars  (Midnight 12.0 "Secret Values" compliant)
+--  HotsNDots - Bars  (Midnight 12.0 "Secret Values" compliant)
 --  Freely movable bars for your own auras on the current target.
---  Fill: StatusBar:SetTimerDuration, number: Cooldown built-in countdown.
+--  Fill: StatusBar:SetTimerDuration, number: Cooldown countdown text.
 --=====================================================================
 
 local ADDON_NAME, ns = ...
 
 ns.bars = ns.bars or {}
 local barAnchor
+
+-- width reserved at the right edge of a bar for the countdown number
+local TIME_COLUMN = 38
 
 --------------------------------------------------------------------
 -- Create a single bar
@@ -34,28 +37,34 @@ local function CreateBar(i)
     bar.iconBorder:SetPoint("BOTTOMRIGHT", bar.icon, "BOTTOMRIGHT", 1.5, -1.5)
     bar.iconBorder:SetColorTexture(0, 0, 0, 1)
 
-    -- countdown NUMBER at the far right of the bar, via a Cooldown frame.
-    -- This renders Blizzard's built-in localized number (e.g. "10"), because
-    -- secret aura times can't be formatted into text ourselves. No swipe here.
-    -- The number is drawn centered inside this frame, so the frame itself is
-    -- the reserved "time column" at the right edge of the bar.
-    bar.timeCD = CreateFrame("Cooldown", nil, bar, "CooldownFrameTemplate")
-    bar.timeCD:SetPoint("RIGHT", bar, "RIGHT", -2, 0)
-    bar.timeCD:SetSize(math.max(34, cfg.height), cfg.height)
-    bar.timeCD:SetDrawSwipe(false)
-    bar.timeCD:SetDrawEdge(false)
-    bar.timeCD:SetHideCountdownNumbers(false)
+    -- stack count on the icon, only ever filled for real stacks (2+)
+    bar.count = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    bar.count:SetPoint("BOTTOMRIGHT", bar.icon, "BOTTOMRIGHT", 1, -1)
+    ns.SetFont(bar.count, cfg.fontSize)
+    bar.count:SetTextColor(1, 1, 1)
 
-    -- Name fills the space LEFT of the time column and is anchored to it, so
-    -- the two can never overlap regardless of bar width or font size.
-    bar.name = bar:CreateFontString(nil, "OVERLAY")
+    -- Countdown NUMBER at the right edge, drawn by a swipe-less Cooldown
+    -- frame. Blizzard's built-in countdown is the only text that can show
+    -- a secret remaining time, so this frame is the bar's "time column".
+    bar.timeCD = ns.CreateTimerText(bar)
+    bar.timeCD:SetPoint("RIGHT", bar, "RIGHT", -2, 0)
+    bar.timeCD:SetSize(TIME_COLUMN, cfg.height)
+    bar.time = ns.GetCountdownFontString(bar.timeCD)
+    if bar.time then
+        bar.time:ClearAllPoints()
+        bar.time:SetPoint("RIGHT", bar.timeCD, "RIGHT", 0, 0)
+        bar.time:SetJustifyH("RIGHT")
+    end
+
+    -- Name fills the space left of the time column. Anchored to the bar
+    -- (not to the cooldown frame) so its width never depends on another
+    -- frame's layout pass.
+    bar.name = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     bar.name:SetPoint("LEFT", bar, "LEFT", 5, 0)
-    bar.name:SetPoint("RIGHT", bar.timeCD, "LEFT", -2, 0)
+    bar.name:SetPoint("RIGHT", bar, "RIGHT", -(TIME_COLUMN + 4), 0)
     bar.name:SetJustifyH("LEFT")
     bar.name:SetWordWrap(false)
-    bar.name:SetFont(STANDARD_TEXT_FONT, cfg.fontSize, "OUTLINE")
-
-    bar.durset = ns.CreateDurationSet()
+    ns.SetFont(bar.name, cfg.fontSize)
 
     return bar
 end
@@ -67,6 +76,11 @@ local function GetBar(i)
         ns.bars[i] = bar
     end
     return bar
+end
+
+local function HideBar(bar)
+    bar.timeCD:Clear()
+    bar:Hide()
 end
 
 --------------------------------------------------------------------
@@ -91,17 +105,18 @@ end
 local barScan = {}
 function ns.Bars_Update()
     if not barAnchor then return end
-    local cfg = ns.db.bars
+    local cfg  = ns.db.bars
+    local unit = cfg.unit
 
     if not cfg.enabled then
-        for i = 1, #ns.bars do ns.bars[i]:Hide() end
+        for i = 1, #ns.bars do HideBar(ns.bars[i]) end
         return
     end
 
     barAnchor:SetWidth(cfg.width)
     barAnchor:SetHeight(cfg.height)
 
-    local list = ns.ScanUnit(cfg.unit, barScan)
+    local list = ns.ScanUnit(unit, barScan)
     table.sort(list, ns.SortByInstanceID)
 
     local n = math.min(#list, cfg.maxBars)
@@ -111,30 +126,40 @@ function ns.Bars_Update()
 
         bar:SetSize(cfg.width, cfg.height)
         bar.icon:SetSize(cfg.height, cfg.height)
-        bar.timeCD:SetSize(math.max(34, cfg.height), cfg.height)
-        bar.name:SetFont(STANDARD_TEXT_FONT, cfg.fontSize, "OUTLINE")
+        ns.SetFont(bar.name, cfg.fontSize)
+        ns.SetFont(bar.count, cfg.fontSize)
+        bar.timeCD:SetSize(TIME_COLUMN, cfg.height)
 
-        -- icon + name (secrets -> pass straight through)
-        pcall(bar.icon.SetTexture, bar.icon, aura.icon)
-        pcall(bar.name.SetText, bar.name, aura.name)
+        -- icon + name (secrets -> passed straight through)
+        bar.icon:SetTexture(aura.icon)
+        bar.name:SetText(aura.name)
 
-        -- color: red = debuff, green = buff/HoT (isHarmful is readable)
-        if aura.isHarmful then
+        -- color: red = debuff, green = buff/HoT
+        if ns.IsHarmful(unit, aura) then
             bar:SetStatusBarColor(0.7, 0.15, 0.15)
         else
             bar:SetStatusBarColor(0.15, 0.6, 0.25)
         end
 
-        bar:Show() -- show BEFORE applying the timers so the first paint sticks
-
-        -- remaining time via Duration object: bar fill + built-in number
-        ns.UpdateDurationSet(bar.durset, aura)
-        if bar.durset.duration and bar.SetTimerDuration then
-            -- (duration, interpolation = 0 immediate, direction = 1 = remaining time)
-            pcall(bar.SetTimerDuration, bar, bar.durset.duration, 0, 1)
+        -- remaining time: one live Duration object drives the number and
+        -- the fill, and both are reset when the aura has no duration
+        local duration = ns.GetDuration(unit, aura)
+        ns.ApplyCooldown(bar.timeCD, duration)
+        ns.ApplyBarFill(bar, duration)
+        -- font goes on AFTER the cooldown starts: the engine picks a font
+        -- of its own when a countdown begins and would overwrite ours
+        if bar.time then
+            ns.SetFont(bar.time, cfg.fontSize)
+            bar.time:SetTextColor(1, 1, 1)
         end
-        if bar.durset.duration and bar.timeCD.SetCooldownFromDurationObject then
-            pcall(bar.timeCD.SetCooldownFromDurationObject, bar.timeCD, bar.durset.duration)
+
+        -- stacks: only real ones (2+), decided C-side so no secret is read
+        if cfg.showStacks then
+            ns.SetStackText(bar.count, unit, aura)
+            bar.count:Show()
+        else
+            bar.count:SetText("")
+            bar.count:Hide()
         end
 
         bar:ClearAllPoints()
@@ -149,7 +174,7 @@ function ns.Bars_Update()
     end
 
     for i = n + 1, #ns.bars do
-        ns.bars[i]:Hide()
+        HideBar(ns.bars[i])
     end
 end
 
@@ -159,7 +184,7 @@ end
 function ns.Bars_Init()
     local cfg = ns.db.bars
 
-    barAnchor = CreateFrame("Frame", "DotsNHotsBarAnchor", UIParent)
+    barAnchor = CreateFrame("Frame", "HotsNDotsBarAnchor", UIParent)
     ns.barAnchor = barAnchor
     barAnchor:SetSize(cfg.width, cfg.height)
     barAnchor:SetPoint(cfg.point.point, UIParent, cfg.point.relPoint, cfg.point.x, cfg.point.y)
@@ -182,7 +207,7 @@ function ns.Bars_Init()
 
     barAnchor.label = barAnchor:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     barAnchor.label:SetPoint("CENTER")
-    barAnchor.label:SetText("DotsNHots  \226\128\148  drag to move")
+    barAnchor.label:SetText("HotsNDots  \226\128\148  drag to move")
 
     ns.Bars_UpdateLock()
     ns.Bars_Update()
