@@ -1,86 +1,137 @@
 --=====================================================================
---  HotsNDots - Bars  (Midnight 12.0 "Secret Values" compliant)
+--  HotsNDots - Bars
 --  Freely movable bars for your own auras on the current target.
---  Fill: StatusBar:SetTimerDuration, number: Cooldown countdown text.
+--
+--  Like the nameplate icons, each bar is an AuraButton owned by the
+--  game: we build the row (icon, status bar, name, seconds, stacks) and
+--  register the pieces, and the game fills them in. The depleting fill
+--  comes from CustomAuraButton:SetDurationBar, the seconds from
+--  SetDurationText - neither needs us to know a remaining time.
 --=====================================================================
 
 local ADDON_NAME, ns = ...
 
-ns.bars = ns.bars or {}
-local barAnchor
+local barAnchor, container
+local styleList = {}   -- every row we built, so it can be restyled later
 
 -- width reserved at the right edge of a bar for the countdown number
 local TIME_COLUMN = 38
 
+local GROUPS = {
+    { key = "dots", kind = "HARMFUL", r = 0.70, g = 0.15, b = 0.15 },
+    { key = "hots", kind = "HELPFUL", r = 0.15, g = 0.60, b = 0.25 },
+}
+
 --------------------------------------------------------------------
--- Create a single bar
+-- One bar
+--  Called by the container right after it creates a button, and only
+--  then: from here on the button belongs to the game.
 --------------------------------------------------------------------
-local function CreateBar(i)
+local function BuildBar(group, button)
     local cfg = ns.db.bars
-    local bar = CreateFrame("StatusBar", nil, barAnchor)
-    bar:SetSize(cfg.width, cfg.height)
+    local style = { button = button, group = group }
+
+    button:SetSize(cfg.width, cfg.height)
+    button:EnableMouse(false)
+
+    -- icon on the left, inside the row
+    style.iconBorder = button:CreateTexture(nil, "BACKGROUND")
+    style.iconBorder:SetColorTexture(0, 0, 0, 1)
+
+    style.icon = button:CreateTexture(nil, "ARTWORK")
+    style.icon:SetPoint("TOPLEFT", 0, 0)
+    style.icon:SetSize(cfg.height, cfg.height)
+    style.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    style.iconBorder:SetPoint("TOPLEFT", style.icon, "TOPLEFT", -1.5, 1.5)
+    style.iconBorder:SetPoint("BOTTOMRIGHT", style.icon, "BOTTOMRIGHT", 1.5, -1.5)
+    button:SetIcon(style.icon)
+
+    -- the bar itself fills whatever is left of the row
+    local bar = CreateFrame("StatusBar", nil, button)
+    bar:SetPoint("TOPLEFT", style.icon, "TOPRIGHT", 2, 0)
+    bar:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetMinMaxValues(0, 1)
-    bar:SetValue(1)
+    bar:SetStatusBarColor(group.r, group.g, group.b)
+    style.bar = bar
 
-    bar.bg = bar:CreateTexture(nil, "BACKGROUND")
-    bar.bg:SetAllPoints()
-    bar.bg:SetColorTexture(0, 0, 0, 0.6)
+    style.barBG = bar:CreateTexture(nil, "BACKGROUND")
+    style.barBG:SetAllPoints()
+    style.barBG:SetColorTexture(0, 0, 0, 0.6)
 
-    bar.icon = bar:CreateTexture(nil, "ARTWORK")
-    bar.icon:SetPoint("RIGHT", bar, "LEFT", -2, 0)
-    bar.icon:SetSize(cfg.height, cfg.height)
-    bar.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    button:SetDurationBar(bar, {
+        direction     = ns.BAR_DIR_REMAINING,
+        interpolation = ns.BAR_INTERP,
+    })
 
-    bar.iconBorder = bar:CreateTexture(nil, "BACKGROUND")
-    bar.iconBorder:SetPoint("TOPLEFT", bar.icon, "TOPLEFT", -1.5, 1.5)
-    bar.iconBorder:SetPoint("BOTTOMRIGHT", bar.icon, "BOTTOMRIGHT", 1.5, -1.5)
-    bar.iconBorder:SetColorTexture(0, 0, 0, 1)
+    -- text above the bar texture
+    local textLayer = CreateFrame("Frame", nil, button)
+    textLayer:SetAllPoints()
+    textLayer:SetFrameLevel(bar:GetFrameLevel() + 1)
+    style.textLayer = textLayer
 
-    -- stack count on the icon, only ever filled for real stacks (2+)
-    bar.count = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    bar.count:SetPoint("BOTTOMRIGHT", bar.icon, "BOTTOMRIGHT", 1, -1)
-    ns.SetFont(bar.count, cfg.fontSize)
-    bar.count:SetTextColor(1, 1, 1)
+    style.time = textLayer:CreateFontString(nil, "OVERLAY")
+    style.time:SetPoint("RIGHT", bar, "RIGHT", -3, 0)
+    style.time:SetJustifyH("RIGHT")
+    ns.SetFont(style.time, cfg.fontSize)
+    style.time:SetTextColor(1, 1, 1)
+    button:SetDurationText(style.time)
 
-    -- Countdown NUMBER at the right edge, drawn by a swipe-less Cooldown
-    -- frame. Blizzard's built-in countdown is the only text that can show
-    -- a secret remaining time, so this frame is the bar's "time column".
-    bar.timeCD = ns.CreateTimerText(bar)
-    bar.timeCD:SetPoint("RIGHT", bar, "RIGHT", -2, 0)
-    bar.timeCD:SetSize(TIME_COLUMN, cfg.height)
-    bar.time = ns.GetCountdownFontString(bar.timeCD)
-    if bar.time then
-        bar.time:ClearAllPoints()
-        bar.time:SetPoint("RIGHT", bar.timeCD, "RIGHT", 0, 0)
-        bar.time:SetJustifyH("RIGHT")
+    style.name = textLayer:CreateFontString(nil, "OVERLAY")
+    style.name:SetPoint("LEFT", bar, "LEFT", 4, 0)
+    style.name:SetPoint("RIGHT", bar, "RIGHT", -(TIME_COLUMN + 4), 0)
+    style.name:SetJustifyH("LEFT")
+    style.name:SetWordWrap(false)
+    ns.SetFont(style.name, cfg.fontSize)
+    style.name:SetTextColor(1, 1, 1)
+    button:SetSpellName(style.name)
+
+    -- stacks on the icon. Without a formatter the game only writes a
+    -- number at 2 or more applications - real stacks only.
+    style.count = textLayer:CreateFontString(nil, "OVERLAY")
+    style.count:SetPoint("BOTTOMRIGHT", style.icon, "BOTTOMRIGHT", 1, -1)
+    ns.SetFont(style.count, cfg.fontSize)
+    style.count:SetTextColor(1, 1, 1)
+    if cfg.showStacks then
+        button:SetApplicationCount(style.count)
     end
 
-    -- Name fills the space left of the time column. Anchored to the bar
-    -- (not to the cooldown frame) so its width never depends on another
-    -- frame's layout pass.
-    bar.name = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    bar.name:SetPoint("LEFT", bar, "LEFT", 5, 0)
-    bar.name:SetPoint("RIGHT", bar, "RIGHT", -(TIME_COLUMN + 4), 0)
-    bar.name:SetJustifyH("LEFT")
-    bar.name:SetWordWrap(false)
-    ns.SetFont(bar.name, cfg.fontSize)
-
-    return bar
+    styleList[#styleList + 1] = style
 end
 
-local function GetBar(i)
-    local bar = ns.bars[i]
-    if not bar then
-        bar = CreateBar(i)
-        ns.bars[i] = bar
+--------------------------------------------------------------------
+-- Layout
+--------------------------------------------------------------------
+local function ApplyLayout()
+    if not container then return end
+    local cfg = ns.db.bars
+
+    barAnchor:SetSize(cfg.width, cfg.height)
+
+    -- The container's size is secret once it holds auras, so it is
+    -- anchored by the corner the bars grow away from.
+    container:ClearAllPoints()
+    if cfg.growthUp then
+        container:SetPoint("BOTTOMLEFT", barAnchor, "BOTTOMLEFT", 0, 0)
+        container:SetFlowLayoutAnchorPoint("BOTTOMLEFT")
+        container:SetFlowLayoutGrowthDirection(ns.FlowDir.Right, ns.FlowDir.Up)
+    else
+        container:SetPoint("TOPLEFT", barAnchor, "TOPLEFT", 0, 0)
+        container:SetFlowLayoutAnchorPoint("TOPLEFT")
+        container:SetFlowLayoutGrowthDirection(ns.FlowDir.Right, ns.FlowDir.Down)
     end
-    return bar
-end
 
-local function HideBar(bar)
-    bar.timeCD:Clear()
-    bar:Hide()
+    for _, group in ipairs(GROUPS) do
+        container:SetAuraGroupLayout(group.key, {
+            elementSpacing = cfg.spacing,
+            elementWidth   = cfg.width,
+            elementHeight  = cfg.height,
+        })
+        container:SetAuraGroupMaxFrameCount(group.key, ns.GroupMaxFrames(group.kind, cfg.maxBars))
+        container:SetAuraGroupFilterString(group.key, ns.FilterString(group.kind))
+        container:SetAuraGroupCandidateFilters(group.key, ns.CandidateFilters(group.kind))
+    end
+
+    container:SetEnabled(cfg.enabled and true or false)
 end
 
 --------------------------------------------------------------------
@@ -100,87 +151,44 @@ function ns.Bars_UpdateLock()
 end
 
 --------------------------------------------------------------------
--- Rebuild the bars
+-- Public interface
 --------------------------------------------------------------------
-local barScan = {}
+-- Filters, growth and the bar cap changed: all container-level, always
+-- allowed, no aura button is touched.
 function ns.Bars_Update()
-    if not barAnchor then return end
-    local cfg  = ns.db.bars
-    local unit = cfg.unit
-
-    if not cfg.enabled then
-        for i = 1, #ns.bars do HideBar(ns.bars[i]) end
-        return
-    end
-
-    barAnchor:SetWidth(cfg.width)
-    barAnchor:SetHeight(cfg.height)
-
-    local list = ns.ScanUnit(unit, barScan)
-    table.sort(list, ns.SortByInstanceID)
-
-    local n = math.min(#list, cfg.maxBars)
-    for i = 1, n do
-        local aura = list[i]
-        local bar  = GetBar(i)
-
-        bar:SetSize(cfg.width, cfg.height)
-        bar.icon:SetSize(cfg.height, cfg.height)
-        ns.SetFont(bar.name, cfg.fontSize)
-        ns.SetFont(bar.count, cfg.fontSize)
-        bar.timeCD:SetSize(TIME_COLUMN, cfg.height)
-
-        -- icon + name (secrets -> passed straight through)
-        bar.icon:SetTexture(aura.icon)
-        bar.name:SetText(aura.name)
-
-        -- color: red = debuff, green = buff/HoT
-        if ns.IsHarmful(unit, aura) then
-            bar:SetStatusBarColor(0.7, 0.15, 0.15)
-        else
-            bar:SetStatusBarColor(0.15, 0.6, 0.25)
-        end
-
-        -- remaining time: one live Duration object drives the number and
-        -- the fill, and both are reset when the aura has no duration
-        local duration = ns.GetDuration(unit, aura)
-        ns.ApplyCooldown(bar.timeCD, duration)
-        ns.ApplyBarFill(bar, duration)
-        -- font goes on AFTER the cooldown starts: the engine picks a font
-        -- of its own when a countdown begins and would overwrite ours
-        if bar.time then
-            ns.SetFont(bar.time, cfg.fontSize)
-            bar.time:SetTextColor(1, 1, 1)
-        end
-
-        -- stacks: only real ones (2+), decided C-side so no secret is read
-        if cfg.showStacks then
-            ns.SetStackText(bar.count, unit, aura)
-            bar.count:Show()
-        else
-            bar.count:SetText("")
-            bar.count:Hide()
-        end
-
-        bar:ClearAllPoints()
-        local yoff = (i - 1) * (cfg.height + cfg.spacing)
-        if cfg.growthUp then
-            bar:SetPoint("BOTTOMLEFT", barAnchor, "BOTTOMLEFT", 0, yoff)
-        else
-            bar:SetPoint("TOPLEFT", barAnchor, "TOPLEFT", 0, -yoff)
-        end
-
-        bar:Show()
-    end
-
-    for i = n + 1, #ns.bars do
-        HideBar(ns.bars[i])
-    end
+    ApplyLayout()
 end
 
---------------------------------------------------------------------
--- Init
---------------------------------------------------------------------
+-- A new target does not necessarily fire UNIT_AURA, so nudge the
+-- container to re-read the unit it is already watching.
+function ns.Bars_OnUnitChanged()
+    if container then container:UpdateAllAuras() end
+end
+
+-- Size and font changes have to reach the buttons themselves, which the
+-- game only lets us touch while auras are not secret.
+function ns.Bars_Restyle()
+    local cfg = ns.db.bars
+
+    ns.TryRestyle(function()
+        for _, style in ipairs(styleList) do
+            style.button:SetSize(cfg.width, cfg.height)
+            style.icon:SetSize(cfg.height, cfg.height)
+            ns.SetFont(style.name, cfg.fontSize)
+            ns.SetFont(style.time, cfg.fontSize)
+            ns.SetFont(style.count, cfg.fontSize)
+            if cfg.showStacks then
+                style.button:SetApplicationCount(style.count)
+            else
+                style.button:ClearApplicationCount()
+                style.count:SetText("")
+            end
+        end
+    end)
+
+    ApplyLayout()
+end
+
 function ns.Bars_Init()
     local cfg = ns.db.bars
 
@@ -209,6 +217,27 @@ function ns.Bars_Init()
     barAnchor.label:SetPoint("CENTER")
     barAnchor.label:SetText("HotsNDots  \226\128\148  drag to move")
 
+    container = CreateFrame("AuraContainer", nil, barAnchor, "CustomAuraContainerTemplate")
+    ns.barContainer = container
+    container:SetFlowLayoutAxis(ns.FlowAxis.Vertical)
+    container:SetFlowLayoutMaximumLineSize(math.huge) -- one column; maxBars caps it
+
+    for _, group in ipairs(GROUPS) do
+        container:AddAuraGroup(group.key, ns.FilterString(group.kind), {
+            maxFrameCount    = ns.GroupMaxFrames(group.kind, cfg.maxBars),
+            candidateFilters = ns.CandidateFilters(group.kind),
+            sortMethod       = ns.SortMethod.ExpirationOnly,
+            sortDirection    = ns.SortDirection.Normal,
+            initializeFrame  = function(button) BuildBar(group, button) end,
+            layout = {
+                elementSpacing = cfg.spacing,
+                elementWidth   = cfg.width,
+                elementHeight  = cfg.height,
+            },
+        })
+    end
+
+    container:SetUnit(cfg.unit)
+    ApplyLayout()
     ns.Bars_UpdateLock()
-    ns.Bars_Update()
 end

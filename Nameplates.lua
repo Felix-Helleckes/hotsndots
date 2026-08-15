@@ -1,328 +1,301 @@
 --=====================================================================
---  HotsNDots - Nameplates  (Midnight 12.0 "Secret Values" compliant)
---  Shows your own auras large above the nameplate:
+--  HotsNDots - Nameplates
+--  Your own auras, large above (or below) the nameplate:
 --  icon + cooldown swipe + big seconds countdown + real stacks.
 --
---  The seconds are drawn by a second, swipe-less Cooldown frame sitting
---  above the icon: Blizzard's built-in countdown is the only text that
---  may still display a secret remaining time.
+--  Every icon is an AuraButton owned by the game. We create the regions
+--  (icon texture, border, countdown text, stack text) and register them
+--  with the button; the game decides which aura goes where and writes
+--  the values in. HotsNDots never reads aura data, and it never touches
+--  the Blizzard nameplate itself - the container hangs off our own
+--  holder frame and is only anchored to the plate.
+--
+--  That last part matters: writing fields onto the nameplate's UnitFrame
+--  or hiding its aura frame used to taint it, and since 12.1 a tainted
+--  nameplate cannot even update its own mana bar
+--  ("attempt to compare local 'currValue' (a secret number value)").
+--  So we leave Blizzard's nameplate strictly alone, which also means the
+--  default nameplate auras are no longer hidden - see the changelog.
 --=====================================================================
 
 local ADDON_NAME, ns = ...
 
--- plates[unitToken] = container frame
-local plates = {}
-ns.nameplateContainers = plates
+local displays  = {}   -- every display we ever built
+local byUnit    = {}   -- [unitToken] = display currently in use
+local freeList  = {}   -- displays not attached to a nameplate right now
+local styleList = {}   -- every icon we built, so it can be restyled later
 
---------------------------------------------------------------------
--- Create a single aura icon
---------------------------------------------------------------------
-local function CreateIcon(parent)
-    local b = CreateFrame("Frame", nil, parent)
-    b:SetFrameStrata("HIGH")
-
-    b.border = b:CreateTexture(nil, "BACKGROUND")
-    b.border:SetPoint("TOPLEFT", -1.5, 1.5)
-    b.border:SetPoint("BOTTOMRIGHT", 1.5, -1.5)
-    b.border:SetColorTexture(0, 0, 0, 1)
-
-    b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetAllPoints()
-    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    -- swipe only - its own countdown text stays off
-    b.cooldown = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
-    b.cooldown:SetAllPoints()
-    b.cooldown:SetDrawEdge(false)
-    b.cooldown:SetHideCountdownNumbers(true)
-    b.cooldown:SetReverse(true)
-    b.cooldown:EnableMouse(false)
-    b.cooldown.noCooldownCount = true
-
-    -- big seconds above the icon (Blizzard's built-in countdown number)
-    b.timeCD = ns.CreateTimerText(b)
-    b.timeCD:SetPoint("BOTTOM", b, "TOP", 0, 0)
-    b.timer = ns.GetCountdownFontString(b.timeCD)
-    if b.timer then
-        b.timer:ClearAllPoints()
-        b.timer:SetPoint("CENTER", b.timeCD, "CENTER", 0, 0)
-        b.timer:SetJustifyH("CENTER")
-    end
-
-    -- stack count in the bottom-right corner
-    b.count = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    b.count:SetPoint("BOTTOMRIGHT", 2, -2)
-    ns.SetFont(b.count, 12)
-    b.count:SetTextColor(1, 1, 1)
-
-    return b
-end
-
-local function GetContainer(nameplate)
-    local c = nameplate.HotsNDots
-    if not c then
-        c = CreateFrame("Frame", nil, nameplate)
-        c:SetFrameStrata("HIGH")
-        c:SetSize(1, 1)
-        c.icons = {}
-        nameplate.HotsNDots = c
-    end
-    return c
-end
-
-local function GetIcon(c, i)
-    local ic = c.icons[i]
-    if not ic then
-        ic = CreateIcon(c)
-        c.icons[i] = ic
-    end
-    return ic
-end
-
-local function HideIcon(ic)
-    -- always wipe the timer state too, otherwise a recycled icon keeps
-    -- showing the previous aura's countdown
-    ic.cooldown:Clear()
-    ic.timeCD:Clear()
-    ic:Hide()
-end
-
---------------------------------------------------------------------
--- Hide / replace the default Blizzard nameplate auras
---  Our icons ALWAYS replace the default ones - there is no point in
---  drawing both. The container is not called the same thing on every
---  build, so find it instead of hard-coding a field name.
---------------------------------------------------------------------
-local AURA_CONTAINER_KEYS = {
-    "BuffFrame", "buffFrame", "AuraFrame", "AurasFrame",
-    "Auras", "BuffContainer", "AuraContainer", "DebuffFrame",
+local GROUPS = {
+    { key = "dots", kind = "HARMFUL", r = 0.65, g = 0.10, b = 0.10 },
+    { key = "hots", kind = "HELPFUL", r = 0.10, g = 0.55, b = 0.15 },
 }
 
-local function FindBlizzardAuraFrame(np)
-    local uf = np and np.UnitFrame
-    if not uf then return nil end
-
-    -- cached per unit frame; `false` means "looked, found nothing"
-    if uf.hndAuraFrame ~= nil then
-        return uf.hndAuraFrame or nil
-    end
-
-    local found, foundKey
-    for _, key in ipairs(AURA_CONTAINER_KEYS) do
-        local f = rawget(uf, key)
-        if type(f) == "table" and type(f.Hide) == "function" and type(f.SetAlpha) == "function" then
-            found, foundKey = f, key
-            break
-        end
-    end
-
-    if not found and uf.GetChildren then
-        -- fall back to a child frame that names itself after buffs/auras
-        for _, child in ipairs({ uf:GetChildren() }) do
-            local n = child.GetName and child:GetName()
-            if n and (n:find("Buff") or n:find("Aura")) then
-                found, foundKey = child, n
-                break
-            end
-        end
-    end
-
-    uf.hndAuraFrame = found or false
-    uf.hndAuraFrameKey = foundKey
-    return found
-end
-
--- /hnd debug: report what we actually found on this client, so a build
--- that renamed the aura container can be identified without guessing.
-function ns.Nameplates_Debug()
-    local n = 0
-    for unit in pairs(plates) do
-        n = n + 1
-        local np = C_NamePlate.GetNamePlateForUnit(unit)
-        local uf = np and np.UnitFrame
-        if not uf then
-            print(ns.BRAND .. ": " .. unit .. " -> no UnitFrame (custom nameplate addon?)")
-        else
-            local bf = FindBlizzardAuraFrame(np)
-            if bf then
-                print(ns.BRAND .. ": " .. unit .. " -> default auras = '" ..
-                      tostring(uf.hndAuraFrameKey) .. "', shown = " .. tostring(bf:IsShown()))
-            else
-                local names = {}
-                for _, child in ipairs({ uf:GetChildren() }) do
-                    names[#names + 1] = tostring(child.GetName and child:GetName() or "<unnamed>")
-                end
-                print(ns.BRAND .. ": " .. unit .. " -> aura container NOT found. Children: " ..
-                      (table.concat(names, ", "):sub(1, 400)))
-            end
-        end
-    end
-    if n == 0 then
-        print(ns.BRAND .. ": no nameplates visible - target something first.")
-    end
-end
-
-local function ApplyBlizzardVisibility(np)
-    local bf = FindBlizzardAuraFrame(np)
-    if not bf then return end
-
-    -- One-time hook. HookScript("OnShow") alone was not enough: it only
-    -- fires on a hidden->shown transition, so a nameplate recycled with an
-    -- already-visible aura frame kept its default icons. Hooking Show()
-    -- itself catches every attempt, including the redundant ones.
-    if not bf.__hndHook then
-        bf.__hndHook = true
-        hooksecurefunc(bf, "Show", function(self)
-            if ns.db and ns.db.nameplates.enabled then
-                self:Hide()
-                self:SetAlpha(0)
-            end
-        end)
-    end
-
-    if ns.db.nameplates.enabled then
-        bf:Hide()
-        bf:SetAlpha(0)
-    else
-        bf:SetAlpha(1)
-        bf:Show()
-    end
-end
-
-function ns.Nameplates_ApplyBlizzardAll()
-    for unit in pairs(plates) do
-        local np = C_NamePlate.GetNamePlateForUnit(unit)
-        if np then ApplyBlizzardVisibility(np) end
-    end
-end
-
 --------------------------------------------------------------------
--- Rebuild all icons of one nameplate
+-- One aura icon
+--  Called by the container right after it creates a button, and only
+--  then: from this point on the button belongs to the game and may not
+--  be touched by us while auras are secret.
 --------------------------------------------------------------------
-local scan = {}
-local function RefreshUnit(unit)
-    local c = plates[unit]
-    if not c then return end
-
+local function BuildIcon(group, button)
     local cfg = ns.db.nameplates
-    if not cfg.enabled then
-        for i = 1, #c.icons do HideIcon(c.icons[i]) end
-        return
+    local style = { button = button, group = group }
+
+    button:SetSize(cfg.size, cfg.size)
+    button:EnableMouse(false)
+
+    style.border = button:CreateTexture(nil, "BACKGROUND")
+    style.border:SetPoint("TOPLEFT", -1.5, 1.5)
+    style.border:SetPoint("BOTTOMRIGHT", 1.5, -1.5)
+    style.border:SetColorTexture(group.r, group.g, group.b, 1)
+
+    style.icon = button:CreateTexture(nil, "ARTWORK")
+    style.icon:SetAllPoints()
+    style.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    button:SetIcon(style.icon)
+
+    -- swipe. The cooldown always exists so the swipe can be switched on
+    -- later without needing to build a region on a button we no longer own.
+    local cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
+    cooldown:SetAllPoints()
+    cooldown:SetDrawEdge(false)
+    cooldown:SetDrawBling(false)
+    cooldown:SetHideCountdownNumbers(true) -- we draw our own, bigger
+    cooldown:SetReverse(true)
+    cooldown:EnableMouse(false)
+    cooldown.noCooldownCount = true        -- keep OmniCC off our icons
+    cooldown:SetDrawSwipe(cfg.showSwipe and true or false)
+    style.cooldown = cooldown
+    button:SetDurationCooldown(cooldown)
+
+    -- text sits on its own frame above the swipe, or it would be drawn under it
+    local textLayer = CreateFrame("Frame", nil, button)
+    textLayer:SetAllPoints()
+    textLayer:SetFrameLevel(cooldown:GetFrameLevel() + 1)
+    style.textLayer = textLayer
+
+    -- big seconds above (or below) the icon
+    style.timer = textLayer:CreateFontString(nil, "OVERLAY")
+    style.timer:SetPoint("BOTTOM", button, "TOP", 0, 0)
+    style.timer:SetJustifyH("CENTER")
+    ns.SetFont(style.timer, cfg.timerFontSize)
+    style.timer:SetTextColor(1, 1, 1)
+    button:SetDurationText(style.timer)
+
+    -- stacks in the bottom-right corner. Without a formatter the game
+    -- only writes a number at 2 or more applications, which is exactly
+    -- the "only real stacks" behaviour.
+    style.count = textLayer:CreateFontString(nil, "OVERLAY")
+    style.count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 2, -2)
+    ns.SetFont(style.count, cfg.stackFontSize)
+    style.count:SetTextColor(1, 1, 1)
+    if cfg.showStacks then
+        button:SetApplicationCount(style.count)
     end
 
-    local np = C_NamePlate.GetNamePlateForUnit(unit)
-    if not np then return end
+    styleList[#styleList + 1] = style
+end
 
-    -- self-healing: Blizzard re-shows its own auras on aura updates, so
-    -- re-assert on every refresh rather than only when the plate appears
-    ApplyBlizzardVisibility(np)
+--------------------------------------------------------------------
+-- Layout of one display
+--------------------------------------------------------------------
+local function ApplyLayout(display)
+    local cfg = ns.db.nameplates
+    local c = display.container
 
-    local list = ns.ScanUnit(unit, scan)
-    table.sort(list, ns.SortByInstanceID)
-
-    local size    = cfg.size
-    local spacing = cfg.spacing
-    local n       = math.min(#list, cfg.maxIcons)
-
+    -- The container sizes itself from the auras it holds, and that size
+    -- is secret - so it can only be anchored by a corner, never centred.
+    -- Growing right from half an icon left of the plate centre keeps a
+    -- single icon centred, which is the common case.
     c:ClearAllPoints()
     if cfg.below then
-        c:SetPoint("TOP", np, "BOTTOM", cfg.xOffset, -cfg.yOffset)
+        c:SetPoint("TOPLEFT", display.holder, "TOPLEFT", 0, 0)
+        c:SetFlowLayoutAnchorPoint("TOPLEFT")
+        c:SetFlowLayoutGrowthDirection(ns.FlowDir.Right, ns.FlowDir.Down)
     else
-        c:SetPoint("BOTTOM", np, "TOP", cfg.xOffset, cfg.yOffset)
-    end
-    c:SetSize(math.max(1, n * size + math.max(0, n - 1) * spacing), size)
-
-    for i = 1, n do
-        local aura = list[i]
-        local ic   = GetIcon(c, i)
-
-        ic:SetSize(size, size)
-        ic:ClearAllPoints()
-        ic:SetPoint("LEFT", c, "LEFT", (i - 1) * (size + spacing), 0)
-
-        -- icon (secret -> passed straight through to the texture)
-        ic.icon:SetTexture(aura.icon)
-
-        -- border color: red = debuff, green = buff/HoT
-        if ns.IsHarmful(unit, aura) then
-            ic.border:SetColorTexture(0.65, 0.1, 0.1, 1)
-        else
-            ic.border:SetColorTexture(0.1, 0.55, 0.15, 1)
-        end
-
-        -- remaining time: one live Duration object drives both the swipe
-        -- and the number, and both get cleared when there is no duration
-        local duration = ns.GetDuration(unit, aura)
-
-        ic.timeCD:SetSize(math.max(size, cfg.timerFontSize * 2.2), cfg.timerFontSize * 1.4)
-        ns.ApplyCooldown(ic.timeCD, duration)
-        -- font goes on AFTER the cooldown starts: the engine picks a font
-        -- of its own when a countdown begins and would overwrite ours
-        if ic.timer then
-            ns.SetFont(ic.timer, cfg.timerFontSize)
-            ic.timer:SetTextColor(1, 1, 1)
-        end
-
-        ic.cooldown:SetDrawSwipe(cfg.showSwipe and true or false)
-        ns.ApplyCooldown(ic.cooldown, cfg.showSwipe and duration or nil)
-
-        -- stacks: only real ones (2+), decided C-side so no secret is read
-        if cfg.showStacks then
-            ns.SetFont(ic.count, cfg.stackFontSize)
-            ns.SetStackText(ic.count, unit, aura)
-            ic.count:Show()
-        else
-            ic.count:SetText("")
-            ic.count:Hide()
-        end
-
-        ic:Show()
+        c:SetPoint("BOTTOMLEFT", display.holder, "BOTTOMLEFT", 0, 0)
+        c:SetFlowLayoutAnchorPoint("BOTTOMLEFT")
+        c:SetFlowLayoutGrowthDirection(ns.FlowDir.Right, ns.FlowDir.Up)
     end
 
-    for i = n + 1, #c.icons do
-        HideIcon(c.icons[i])
+    for _, group in ipairs(GROUPS) do
+        c:SetAuraGroupLayout(group.key, {
+            elementSpacing = cfg.spacing,
+            elementWidth   = cfg.size,
+            elementHeight  = cfg.size,
+        })
+        c:SetAuraGroupMaxFrameCount(group.key, ns.GroupMaxFrames(group.kind, cfg.maxIcons))
+        c:SetAuraGroupFilterString(group.key, ns.FilterString(group.kind, "INCLUDE_NAME_PLATE_ONLY"))
+        c:SetAuraGroupCandidateFilters(group.key, ns.CandidateFilters(group.kind))
     end
+end
+
+--------------------------------------------------------------------
+-- Build a display (holder + container + groups)
+--------------------------------------------------------------------
+local function CreateDisplay()
+    local cfg = ns.db.nameplates
+
+    -- Our own frame, so that moving the display around never means
+    -- anchoring anything to the container (whose size is secret).
+    local holder = CreateFrame("Frame", nil, UIParent)
+    holder:SetSize(1, 1)
+    holder:SetFrameStrata("HIGH")
+    holder:Hide()
+
+    local container = CreateFrame("AuraContainer", nil, holder, "CustomAuraContainerTemplate")
+    container:SetFlowLayoutAxis(ns.FlowAxis.Horizontal)
+    container:SetFlowLayoutMaximumLineSize(math.huge) -- one row; maxIcons caps it
+
+    local display = { holder = holder, container = container }
+
+    for _, group in ipairs(GROUPS) do
+        container:AddAuraGroup(group.key, ns.FilterString(group.kind, "INCLUDE_NAME_PLATE_ONLY"), {
+            maxFrameCount    = ns.GroupMaxFrames(group.kind, cfg.maxIcons),
+            candidateFilters = ns.CandidateFilters(group.kind),
+            sortMethod       = ns.SortMethod.ExpirationOnly,
+            sortDirection    = ns.SortDirection.Normal,
+            initializeFrame  = function(button) BuildIcon(group, button) end,
+            layout = {
+                elementSpacing = cfg.spacing,
+                elementWidth   = cfg.size,
+                elementHeight  = cfg.size,
+            },
+        })
+    end
+
+    ApplyLayout(display)
+    displays[#displays + 1] = display
+    return display
+end
+
+local function AcquireDisplay()
+    local display = table.remove(freeList) or CreateDisplay()
+    return display
+end
+
+local function ReleaseDisplay(display)
+    display.container:SetEnabled(false)
+    display.holder:Hide()
+    display.holder:ClearAllPoints()
+    display.unit = nil
+    freeList[#freeList + 1] = display
+end
+
+--------------------------------------------------------------------
+-- Attach a display to a nameplate
+--  The Blizzard nameplate is only ever read here: we anchor to it and
+--  never write a field, call a method or hook anything on it.
+--------------------------------------------------------------------
+local function Attach(display, unit, plate)
+    local cfg = ns.db.nameplates
+    local holder = display.holder
+    local halfIcon = cfg.size / 2
+
+    holder:ClearAllPoints()
+    if cfg.below then
+        holder:SetPoint("TOPLEFT", plate, "BOTTOM", cfg.xOffset - halfIcon, -cfg.yOffset)
+    else
+        holder:SetPoint("BOTTOMLEFT", plate, "TOP", cfg.xOffset - halfIcon, cfg.yOffset)
+    end
+
+    display.unit = unit
+    holder:Show()
+    display.container:SetUnit(unit)
+    display.container:SetEnabled(cfg.enabled and true or false)
 end
 
 --------------------------------------------------------------------
 -- Public interface
 --------------------------------------------------------------------
 function ns.Nameplates_OnAdded(unit)
-    local np = C_NamePlate.GetNamePlateForUnit(unit)
-    if not np then return end
-    local c = GetContainer(np)
-    c.unit = unit
-    plates[unit] = c
-    ApplyBlizzardVisibility(np)
-    RefreshUnit(unit)
+    if not ns.hasAuraContainers or not unit then return end
+
+    local plate = C_NamePlate.GetNamePlateForUnit(unit)
+    if not plate then return end
+
+    -- A token can come back without a matching removal (zoning, a plate
+    -- recycled onto a different mob), so re-attach what is already there
+    -- rather than leaking the display and blocking the new unit.
+    local display = byUnit[unit]
+    if not display then
+        display = AcquireDisplay()
+        byUnit[unit] = display
+    end
+    Attach(display, unit, plate)
 end
 
 function ns.Nameplates_OnRemoved(unit)
-    local c = plates[unit]
-    if c then
-        for i = 1, #c.icons do HideIcon(c.icons[i]) end
-        c.unit = nil
-        plates[unit] = nil
-    end
+    local display = unit and byUnit[unit]
+    if not display then return end
+    byUnit[unit] = nil
+    ReleaseDisplay(display)
 end
 
-function ns.Nameplates_OnUnitAura(unit)
-    if plates[unit] then
-        RefreshUnit(unit)
-    end
-end
-
+-- Re-anchor and re-filter every visible display. Safe at any time: it
+-- only touches our own holder and the container's inbound interface,
+-- never an aura button.
 function ns.Nameplates_RefreshAll()
-    for unit in pairs(plates) do
-        RefreshUnit(unit)
+    if not ns.hasAuraContainers then return end
+    for _, display in ipairs(displays) do
+        ApplyLayout(display)
+    end
+    for unit, display in pairs(byUnit) do
+        local plate = C_NamePlate.GetNamePlateForUnit(unit)
+        if plate then
+            Attach(display, unit, plate)
+        end
     end
 end
+
+-- Push size/font changes into the buttons themselves. The game owns
+-- them, so this is only permitted while auras are not secret; when it is
+-- refused the attempt is repeated after combat.
+function ns.Nameplates_Restyle()
+    local cfg = ns.db.nameplates
+
+    ns.TryRestyle(function()
+        for _, style in ipairs(styleList) do
+            style.button:SetSize(cfg.size, cfg.size)
+            style.cooldown:SetDrawSwipe(cfg.showSwipe and true or false)
+            ns.SetFont(style.timer, cfg.timerFontSize)
+            ns.SetFont(style.count, cfg.stackFontSize)
+            if cfg.showStacks then
+                style.button:SetApplicationCount(style.count)
+            else
+                style.button:ClearApplicationCount()
+                style.count:SetText("")
+            end
+        end
+    end)
+
+    ns.Nameplates_RefreshAll()
+end
+
+-- Adding an aura group makes the container allocate a batch of buttons
+-- up front, and our initializeFrame runs for each of them. Doing that for
+-- the first time in the middle of a pull is a needless hitch, so a few
+-- displays are built at login and then reused for the rest of the session.
+local PREWARM = 5
 
 function ns.Nameplates_Init()
-    for _, np in ipairs(C_NamePlate.GetNamePlates() or {}) do
-        local unit = np.namePlateUnitToken or (np.UnitFrame and np.UnitFrame.unit)
+    for _ = 1, PREWARM do
+        freeList[#freeList + 1] = CreateDisplay()
+    end
+
+    for _, plate in ipairs(C_NamePlate.GetNamePlates() or {}) do
+        local unit = plate.namePlateUnitToken
         if unit then
             ns.Nameplates_OnAdded(unit)
         end
     end
+end
+
+--------------------------------------------------------------------
+-- /hnd debug
+--------------------------------------------------------------------
+function ns.Nameplates_Debug()
+    local shown = 0
+    for _ in pairs(byUnit) do shown = shown + 1 end
+    print(ns.BRAND .. ": nameplate displays " .. shown .. " active, " ..
+          #displays .. " built, " .. #styleList .. " icons.")
 end

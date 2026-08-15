@@ -48,6 +48,24 @@ end
 --------------------------------------------------------------------
 -- Build the settings panel
 --------------------------------------------------------------------
+-- Container-level changes (filters, growth, caps, offsets). Always
+-- allowed: no aura button is touched.
+local function RefreshAll()
+    if ns.Nameplates_RefreshAll then ns.Nameplates_RefreshAll() end
+    if ns.Bars_Update then ns.Bars_Update() end
+end
+
+-- Changes that have to reach the aura buttons themselves (sizes, fonts,
+-- stacks). The game only lets us touch them while auras are not secret,
+-- so these are retried after combat when they are refused.
+local function RestyleNameplates()
+    if ns.Nameplates_Restyle then ns.Nameplates_Restyle() end
+end
+
+local function RestyleBars()
+    if ns.Bars_Restyle then ns.Bars_Restyle() end
+end
+
 function ns.Options_Init()
     local db = ns.db
     local panel = CreateFrame("Frame")
@@ -68,11 +86,9 @@ function ns.Options_Init()
     h1:SetPoint("TOPLEFT", 24, -80)
     h1:SetText("Nameplate icons")
 
-    -- Turning this on always replaces the default Blizzard nameplate auras;
-    -- showing both at once was never useful, so it is no longer a choice.
-    CreateCheckbox(panel, "Show nameplate icons (replaces the default auras)", 24, -104,
+    CreateCheckbox(panel, "Show nameplate icons", 24, -104,
         function() return db.nameplates.enabled end,
-        function(v) db.nameplates.enabled = v; ns.Nameplates_RefreshAll(); ns.Nameplates_ApplyBlizzardAll() end)
+        function(v) db.nameplates.enabled = v; ns.Nameplates_RefreshAll() end)
 
     CreateCheckbox(panel, "Show below the nameplate", 24, -130,
         function() return db.nameplates.below end,
@@ -80,19 +96,19 @@ function ns.Options_Init()
 
     CreateCheckbox(panel, "Show stacks (only real stacks, 2+)", 24, -156,
         function() return db.nameplates.showStacks end,
-        function(v) db.nameplates.showStacks = v; ns.Nameplates_RefreshAll() end)
+        function(v) db.nameplates.showStacks = v; RestyleNameplates() end)
 
     CreateCheckbox(panel, "Show cooldown swipe", 24, -182,
         function() return db.nameplates.showSwipe end,
-        function(v) db.nameplates.showSwipe = v; ns.Nameplates_RefreshAll() end)
+        function(v) db.nameplates.showSwipe = v; RestyleNameplates() end)
 
     CreateSlider(panel, "Icon size", 40, -230, 16, 64, 1,
         function() return db.nameplates.size end,
-        function(v) db.nameplates.size = v; ns.Nameplates_RefreshAll() end)
+        function(v) db.nameplates.size = v; RestyleNameplates() end)
 
     CreateSlider(panel, "Seconds font size", 40, -278, 8, 36, 1,
         function() return db.nameplates.timerFontSize end,
-        function(v) db.nameplates.timerFontSize = v; ns.Nameplates_RefreshAll() end)
+        function(v) db.nameplates.timerFontSize = v; RestyleNameplates() end)
 
     CreateSlider(panel, "Distance from nameplate", 40, -326, 0, 60, 1,
         function() return db.nameplates.yOffset end,
@@ -121,29 +137,60 @@ function ns.Options_Init()
 
     CreateCheckbox(panel, "Show stacks (only real stacks, 2+)", 330, -182,
         function() return db.bars.showStacks end,
-        function(v) db.bars.showStacks = v; ns.Bars_Update() end)
+        function(v) db.bars.showStacks = v; RestyleBars() end)
 
     CreateSlider(panel, "Bar width", 346, -230, 100, 400, 5,
         function() return db.bars.width end,
-        function(v) db.bars.width = v; ns.Bars_Update() end)
+        function(v) db.bars.width = v; RestyleBars() end)
 
     CreateSlider(panel, "Bar height", 346, -278, 12, 40, 1,
         function() return db.bars.height end,
-        function(v) db.bars.height = v; ns.Bars_Update() end)
+        function(v) db.bars.height = v; RestyleBars() end)
 
     CreateSlider(panel, "Max bars", 346, -326, 1, 20, 1,
         function() return db.bars.maxBars end,
         function(v) db.bars.maxBars = v; ns.Bars_Update() end)
 
+    -- =========================== RIGHT COLUMN: Filters =============================
+    -- "Mine" is not the same as "worth watching": your own long raid buffs,
+    -- utility snares and CC all land in the list otherwise, and the icon/bar
+    -- count is capped - so junk auras push real DoTs out of the display.
     local h3 = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     h3:SetPoint("TOPLEFT", 330, -370)
-    h3:SetText("General")
+    h3:SetText("Filters")
 
-    CreateCheckbox(panel, "Also count pet auras", 330, -394,
-        function() return db.includePet end,
-        function(v) db.includePet = v; ns.Nameplates_RefreshAll(); ns.Bars_Update() end)
+    CreateCheckbox(panel, "Show debuffs (your DoTs on enemies)", 330, -394,
+        function() return db.filters.showDebuffs end,
+        function(v) db.filters.showDebuffs = v; RefreshAll() end)
 
-    CreateCheckbox(panel, "Show minimap button", 330, -420,
+    CreateCheckbox(panel, "Show buffs (your HoTs on friends)", 330, -420,
+        function() return db.filters.showBuffs end,
+        function(v) db.filters.showBuffs = v; RefreshAll() end)
+
+    -- Permanent auras, split by kind: your own raid buffs never expire
+    -- and would sit in the capped slots forever, but a permanent DoT
+    -- (Absolute Corruption) is exactly what you want to see.
+    CreateCheckbox(panel, "Hide buffs without a timer", 330, -446,
+        function() return db.filters.hidePermanentBuffs end,
+        function(v) db.filters.hidePermanentBuffs = v; RefreshAll() end)
+
+    CreateCheckbox(panel, "Hide debuffs without a timer", 330, -472,
+        function() return db.filters.hidePermanentDebuffs end,
+        function(v) db.filters.hidePermanentDebuffs = v; RefreshAll() end)
+
+    CreateCheckbox(panel, "Hide crowd control", 330, -498,
+        function() return db.filters.hideCrowdControl end,
+        function(v) db.filters.hideCrowdControl = v; RefreshAll() end)
+
+    -- =========================== LEFT COLUMN: General ==============================
+    local h4 = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    h4:SetPoint("TOPLEFT", 24, -420)
+    h4:SetText("General")
+
+    -- There is no "also count pet auras" option any more: the game's
+    -- PLAYER filter now always covers your pet's and your vehicle's
+    -- auras, and there is no separate filter left to ask for.
+    CreateCheckbox(panel, "Show minimap button", 24, -444,
         function() return not db.minimap.hide end,
         function(v) db.minimap.hide = not v; ns.Minimap_UpdateShown() end)
 
@@ -198,9 +245,18 @@ SlashCmdList["HOTSNDOTS"] = function(msg)
         ns.Bars_Update()
         print("|cff33ff99HotsNDots|r: bars " .. (ns.db.bars.enabled and "ON" or "OFF"))
     elseif msg == "debug" then
+        local version, build, _, iface = GetBuildInfo()
+        print(ns.BRAND .. ": client " .. tostring(version) .. " (build " .. tostring(build) ..
+            "), interface " .. tostring(iface))
+        print(ns.BRAND .. ": AuraContainer = " ..
+            (ns.hasAuraContainers and "usable (CustomAuraContainerTemplate)"
+                                  or "MISSING - needs client 12.1.0"))
         print(ns.BRAND .. ": font = " .. tostring(ns.FONT_PATH))
         print(ns.BRAND .. ": minimap button = " ..
-            (ns.ldbIcon and "LibDBIcon (collectable by Leatrix/ElvUI/...)" or "built-in fallback"))
+            (ns.ldbIcon and "LibDBIcon (collectable by Leatrix/ElvUI/...)"
+                        or "built-in (no LibDBIcon around)"))
+        print(ns.BRAND .. ": nameplate filter = " .. ns.FilterString("HARMFUL", "INCLUDE_NAME_PLATE_ONLY"))
+        print(ns.BRAND .. ": bar filter = " .. ns.FilterString("HELPFUL"))
         if ns.Nameplates_Debug then ns.Nameplates_Debug() end
     elseif msg == "minimap" then
         ns.db.minimap.hide = not ns.db.minimap.hide
