@@ -9,7 +9,7 @@ It shows them **two ways at once**:
 - 🎯 **On the nameplate** — large icons with a **seconds countdown**, cooldown swipe and stacks, sized well above the default WoW display.
 - 📊 **As movable bars** — a clean, freely draggable bar list for your current target, with icon, spell name, a live timer and a depleting bar.
 
-Works for **every class and spec**, for both **DoTs on enemies** and **HoTs/buffs on friends** (healers included), and in **every game language** — it never reads spell names, so localization is automatic.
+Works for **every class and spec**, for both **DoTs on enemies** and **HoTs/buffs on friends** (healers included), and in **every game language** — it never reads spell names, so spell localization is automatic; the addon's own interface is translated into German, French and Spanish.
 
 ---
 
@@ -22,10 +22,13 @@ Works for **every class and spec**, for both **DoTs on enemies** and **HoTs/buff
 - **Filters.** Debuffs only, buffs only, hide crowd control, and hide auras that have no timer at all (your own raid buffs) so they stop taking up slots.
 - **Sits above or below the nameplate.** Blizzard's own nameplate auras are left alone: since 12.1 there is no way for an addon to hide them without tainting the nameplate, which breaks it. Turn them down in the game's Nameplate options if you want only these.
 - **Freely movable bars** for the current target — drag them anywhere, lock them in place.
+- **Speaks your client's language.** German, English, French and Spanish (esES/esMX), picked from the game itself - no setting to find. Any other client language falls back to English.
+- **Bar styles.** Four presets (default, compact, icon on the right, no icon), a bar texture, a font and your own DoT/HoT colours, with a live preview. Textures and fonts come from **LibSharedMedia** if any addon has loaded it — otherwise from a small built-in list, so nothing has to be installed.
+- **A profile per specialization.** Filters, icon sizes, bar layout and the bar position live in a profile, and each spec picks its own — switch spec and the arrangement switches with it. There is always a **Default** profile; profiles are shared by all your characters. Manage them under *Options > AddOns > HotsNDots > Profiles*.
 - **Fully configurable** in-game settings screen: icon size, seconds font size, height above the nameplate, max icons, bar size, bar count, grow direction, and more.
 - **Minimap button** (registered via LibDBIcon when available, so button collectors like Leatrix Plus' button bag pick it up) and a native **Addon Compartment** entry.
 - **Slash commands** for quick toggling.
-- **Lightweight & self-contained.** Ships no libraries and has no dependencies; it only *uses* LibDBIcon if some other addon already loaded it. No background timers — the countdown is driven by the game itself.
+- **Lightweight & self-contained.** Ships no libraries and has no dependencies; it only *uses* LibDBIcon and LibSharedMedia if some other addon already loaded them. No background timers — the countdown is driven by the game itself.
 - **Midnight 12.0 ready.** Built around the new **Secret Values** system (`C_UnitAuras.GetAuraDuration`, `SetCooldownFromDurationObject`, `SetTimerDuration`, `GetAuraApplicationDisplayCount`).
 
 ---
@@ -53,7 +56,9 @@ Works for **every class and spec**, for both **DoTs on enemies** and **HoTs/buff
 | `/hnd bars` | Toggle bars on/off |
 | `/hnd nameplates` | Toggle nameplate icons on/off |
 | `/hnd minimap` | Toggle the minimap button |
-| `/hnd forget` | Clear the learned spell list for this class |
+| `/hnd profiles` | List the profiles (the active one is highlighted) |
+| `/hnd profile <name>` | Put the spec you are in on that profile (names are case sensitive) |
+| `/hnd newprofile <name>` | Create a profile and switch this spec to it |
 | `/hnd debug` | Print diagnostics (font, minimap route, nameplate aura container, aura secrecy) |
 
 The old `/dotsnhots` and `/dnh` aliases still work.

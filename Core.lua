@@ -25,6 +25,15 @@ ns.name = "HotsNDots"
 local BRAND = "|cff33ff99HotsNDots|r"
 ns.BRAND = BRAND
 
+-- Locale.lua is loaded before this file, and if it ISN'T - an update
+-- installed while the game was running, where the .toc is still the old
+-- one - then ns.L is nil, and every localised string in the addon is an
+-- index of nil. Bars.lua reads it at FILE scope for the preset labels, so
+-- that file would not even load. A stand-in that answers its own key is
+-- ugly on screen and alive, which is the whole point of the degradation
+-- path in ADDON_LOADED below.
+ns.L = ns.L or setmetatable({}, { __index = function(_, k) return tostring(k) end })
+
 --------------------------------------------------------------------
 -- Capability check
 --  AuraContainer and CustomAuraContainerTemplate arrived in 12.1.0.
@@ -81,11 +90,21 @@ do
 end
 ns.FONT_PATH = FONT_PATH
 
-function ns.SetFont(fontString, size, outline)
+-- `path` lets a caller ask for a chosen font (the bars do). It falls back
+-- the same way the default does, and for the same reason: a font that
+-- cannot be set leaves the text with NO font at all, which reads as
+-- "my timers disappeared" rather than as a bad font pick. A media
+-- library that was uninstalled since the pick was made is exactly that
+-- case, so it has to land somewhere sane rather than nowhere.
+function ns.SetFont(fontString, size, outline, path)
     if not fontString then return end
-    if not fontString:SetFont(FONT_PATH, size, outline or "OUTLINE") then
+    outline = outline or "OUTLINE"
+    if path and path ~= FONT_PATH and fontString:SetFont(path, size, outline) then
+        return
+    end
+    if not fontString:SetFont(FONT_PATH, size, outline) then
         -- last resort so the text is never invisible
-        fontString:SetFont([[Fonts\FRIZQT__.TTF]], size, outline or "OUTLINE")
+        fontString:SetFont([[Fonts\FRIZQT__.TTF]], size, outline)
     end
 end
 
@@ -137,6 +156,16 @@ local defaults = {
         fontSize   = 13,
         showStacks = true,     -- only ever shows real stacks (2+)
         point      = { point = "CENTER", relPoint = "CENTER", x = 320, y = 0 },
+
+        -- Look of a bar row. The preset only rearranges the pieces that
+        -- already exist (see BarStyles in Bars.lua); texture and font are
+        -- names, not paths, so a LibSharedMedia pick survives a reload
+        -- even if the library is loaded later - or not at all.
+        style      = "default",
+        texture    = "Blizzard",
+        font       = "Default",
+        colorDot   = { r = 0.70, g = 0.15, b = 0.15 },
+        colorHot   = { r = 0.15, g = 0.60, b = 0.25 },
     },
 
     minimap = {
@@ -242,6 +271,43 @@ function ns.RestyleAll()
 end
 
 --------------------------------------------------------------------
+-- Isolated start-up
+--  Nameplates, bars, options and the minimap button are four unrelated
+--  things started from ONE event handler. A Lua error in any of them
+--  aborts the handler, so everything after it never runs - and since the
+--  minimap button is built last, a bug anywhere presents itself as "the
+--  minimap icon is gone", with nothing saying which part actually broke.
+--
+--  Each one therefore runs on its own now. The error is printed AND kept
+--  in the saved variables, because the interesting one happens at login,
+--  scrolls away, and is gone by the time anyone looks - and an error you
+--  cannot read afterwards costs a full session to reproduce.
+--------------------------------------------------------------------
+local function SafeInit(label, fn)
+    if not fn then return end
+
+    local ok, err = xpcall(fn, function(e)
+        return tostring(e) .. "\n" .. (debugstack and debugstack(2) or "")
+    end)
+    if ok then return end
+
+    HotsNDotsDB = HotsNDotsDB or {}
+    HotsNDotsDB.lastError = {
+        where   = label,
+        message = tostring(err),
+        at      = date and date("%Y-%m-%d %H:%M:%S") or "",
+        version = (C_AddOns and C_AddOns.GetAddOnMetadata
+                   and C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")) or "?",
+    }
+    ns.lastError = HotsNDotsDB.lastError
+
+    print(BRAND .. ": |cffff4444" .. format(ns.L.msgInitFailed, label) .. "|r")
+    print(BRAND .. ": " .. (tostring(err):gsub("\n.*", "")))
+    print(BRAND .. ": " .. ns.L.msgDebugHint)
+end
+ns.SafeInit = SafeInit
+
+--------------------------------------------------------------------
 -- Central event dispatch
 --  UNIT_AURA is deliberately not registered any more: every container
 --  subscribes itself and refreshes its own buttons C-side.
@@ -257,51 +323,57 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if HotsNDotsDB == nil and type(DotsNHotsDB) == "table" then
             HotsNDotsDB = DotsNHotsDB
         end
-        HotsNDotsDB = copyDefaults(defaults, HotsNDotsDB or {})
-        ns.db = HotsNDotsDB
+        HotsNDotsDB = HotsNDotsDB or {}
 
-        -- 1.1.0: "show stacks" changed meaning. It used to print the raw
-        -- number on every aura (so a plain DoT read "1") and was therefore
-        -- off by default; it now shows real stacks only. The stored value
-        -- no longer describes the same option, so opt everyone back in once.
-        if (ns.db.dbVersion or 0) < 1 then
-            ns.db.nameplates.showStacks = true
-            ns.db.bars.showStacks = true
+        -- A file that is NEW in the .toc only arrives after a full
+        -- client restart: /reload re-runs the Lua the game already knows
+        -- about, but it does not re-read the file list. An update
+        -- installed while the game is running - which is exactly what an
+        -- addon manager does - therefore reaches this file before it
+        -- reaches Profiles.lua, and a nil call here would take the whole
+        -- addon down with a Lua error and no display at all.
+        --
+        -- So degrade instead: keep the flat table as the active settings,
+        -- which is precisely the shape this build's predecessor used, and
+        -- say what is going on. Everything keeps working; only profiles
+        -- are missing, and they arrive with the restart.
+        if not ns.Profiles_Setup then
+            ns.db = copyDefaults(defaults, HotsNDotsDB)
+            ns.global = ns.db  -- in the old shape the minimap lives here
+            print(BRAND .. ": " .. ns.L.msgUpdate1)
+            print(BRAND .. ": " .. ns.L.msgUpdate2)
+            print(BRAND .. ": " .. ns.L.msgUpdate3)
+            return
         end
 
-        -- 1.4.0: the display belongs to the game now. Settings that only
-        -- made sense for the old hand-rolled scanner are dropped.
-        if (ns.db.dbVersion or 0) < 2 then
-            ns.db.watch      = nil -- learned spell names of the by-name fallback
-            ns.db.includePet = nil -- "PLAYER" always covers pet/vehicle now
-            ns.db.onlyMine   = nil -- was never anything but true
-            ns.db.nameplates.hideBlizzard = nil
-            ns.db.dbVersion = 2
-        end
-
-        -- 1.4.1: one "hide auras without a timer" switch became two. The
-        -- old one only ever hid raid buffs on purpose; applying it to
-        -- debuffs as well swallowed permanent DoTs like Absolute
-        -- Corruption, so debuffs start out visible regardless.
-        if (ns.db.dbVersion or 0) < 3 then
-            if ns.db.filters.hidePermanent ~= nil then
-                ns.db.filters.hidePermanentBuffs = ns.db.filters.hidePermanent
-                ns.db.filters.hidePermanent = nil
-            end
-            ns.db.filters.hidePermanentDebuffs = false
-            ns.db.dbVersion = 3
-        end
+        -- Everything about the shape of the save, including every
+        -- migration that used to live here, is now Profiles' business:
+        -- the old flat settings become the "Default" profile and the
+        -- per-version fixups run on each profile instead of once.
+        -- ns.db points at the ACTIVE profile from here on.
+        ns.Profiles_Setup(HotsNDotsDB)
 
     elseif event == "PLAYER_LOGIN" then
+        -- ADDON_LOADED is too early for GetSpecialization(): it can still
+        -- answer nil there, which would put every character on Default
+        -- for the rest of the session. Resolve again now, before anything
+        -- is built, so the display comes up on the right profile.
+        --
+        -- Guarded for the same reason as the setup call above: this line
+        -- sits BEFORE everything that builds the display, so without the
+        -- guard a half-installed update takes the whole display with it -
+        -- which is exactly how it presents itself: "nothing shows up".
+        if ns.Profiles_ApplyForSpec then ns.Profiles_ApplyForSpec(true) end
+
         if ns.hasAuraContainers then
-            if ns.Nameplates_Init then ns.Nameplates_Init() end
-            if ns.Bars_Init      then ns.Bars_Init()      end
+            SafeInit("Nameplates", ns.Nameplates_Init)
+            SafeInit("Bars",       ns.Bars_Init)
         else
-            print(BRAND .. ": this client has no AuraContainer widget (needs 12.1.0),")
-            print(BRAND .. ": so the aura display stays off. Please update the game.")
+            print(BRAND .. ": " .. ns.L.msgNoContainer1)
+            print(BRAND .. ": " .. ns.L.msgNoContainer2)
         end
-        if ns.Options_Init then ns.Options_Init() end
-        if ns.Minimap_Init then ns.Minimap_Init() end
+        SafeInit("Options", ns.Options_Init)
+        SafeInit("Minimap", ns.Minimap_Init)
 
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- auras stop being secret here, so anything the client refused
@@ -309,6 +381,26 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if pendingRestyle then
             pendingRestyle = false
             ns.RestyleAll()
+        end
+
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Second chance at the spec. GetSpecialization() can still answer
+        -- nil at PLAYER_LOGIN on a slow load, and a character that came up
+        -- on the wrong profile would stay there until it changed spec -
+        -- the same "only ever resolved once at startup" trap that keeps
+        -- catching everything else. Re-resolving costs nothing when the
+        -- answer is the same.
+        if ns.Profiles_ApplyForSpec then ns.Profiles_ApplyForSpec(true) end
+
+    elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
+        -- Fires for group members too, so it has to be OUR spec - and it
+        -- fires before the new spec is readable often enough that the
+        -- lookup is deferred by a frame. Re-resolving is cheap and lands
+        -- on the same profile when nothing changed.
+        if arg1 == nil or arg1 == "player" then
+            C_Timer.After(0, function()
+                if ns.Profiles_ApplyForSpec then ns.Profiles_ApplyForSpec() end
+            end)
         end
 
     elseif event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_FOCUS_CHANGED" then
@@ -325,6 +417,8 @@ end)
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 eventFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
 eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")

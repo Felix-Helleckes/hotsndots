@@ -17,7 +17,10 @@ $dest    = Join-Path $staging $name
 # Files that ship inside the addon folder
 $include = @(
     'HotsNDots.toc',
+    'Locale.lua',
     'Core.lua',
+    'Profiles.lua',
+    'Media.lua',
     'Nameplates.lua',
     'Bars.lua',
     'Minimap.lua',

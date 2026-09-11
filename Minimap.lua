@@ -19,7 +19,7 @@ local button
 --------------------------------------------------------------------
 local function UpdatePosition()
     if not button then return end
-    local angle = math.rad(ns.db.minimap.angle or 220)
+    local angle = math.rad(ns.global.minimap.angle or 220)
     local w = (Minimap:GetWidth()  / 2) + 5
     local h = (Minimap:GetHeight() / 2) + 5
     button:ClearAllPoints()
@@ -32,7 +32,7 @@ local function OnDragUpdate()
     local scale  = Minimap:GetEffectiveScale()
     local cx, cy = GetCursorPosition()
     cx, cy = cx / scale, cy / scale
-    ns.db.minimap.angle = math.deg(math.atan2(cy - my, cx - mx))
+    ns.global.minimap.angle = math.deg(math.atan2(cy - my, cx - mx))
     UpdatePosition()
 end
 
@@ -41,7 +41,7 @@ end
 --------------------------------------------------------------------
 function ns.Minimap_UpdateShown()
     if ns.ldbIcon then
-        if ns.db.minimap.hide then
+        if ns.global.minimap.hide then
             ns.ldbIcon:Hide(ns.name)
         else
             ns.ldbIcon:Show(ns.name)
@@ -49,7 +49,7 @@ function ns.Minimap_UpdateShown()
         return
     end
     if not button then return end
-    if ns.db.minimap.hide then button:Hide() else button:Show() end
+    if ns.global.minimap.hide then button:Hide() else button:Show() end
 end
 
 --------------------------------------------------------------------
@@ -78,17 +78,17 @@ local function TryLibDBIcon()
             if mouseButton == "RightButton" then
                 ns.db.bars.locked = not ns.db.bars.locked
                 ns.Bars_UpdateLock()
-                print(ns.BRAND .. ": bars " ..
-                    (ns.db.bars.locked and "locked." or "unlocked \226\128\147 drag to move."))
+                print(ns.BRAND .. ": " ..
+                    (ns.db.bars.locked and ns.L.msgBarsLocked or ns.L.msgBarsUnlocked))
             else
                 ns.OpenConfig()
             end
         end,
         OnTooltipShow = function(tt)
             tt:AddLine(ns.BRAND)
-            tt:AddLine("Left click: settings", 1, 1, 1)
-            tt:AddLine("Right click: lock/unlock bars", 1, 1, 1)
-            tt:AddLine("Drag: move this button", 1, 1, 1)
+            tt:AddLine(ns.L.ttLeftSettings, 1, 1, 1)
+            tt:AddLine(ns.L.ttRightLock, 1, 1, 1)
+            tt:AddLine(ns.L.ttDrag, 1, 1, 1)
         end,
     })
     if not obj then return false end
@@ -97,7 +97,7 @@ local function TryLibDBIcon()
     -- untouched so the fallback button keeps its position too.
     -- showInCompartment is deliberately NOT set: the .toc already
     -- registers an Addon Compartment entry and we don't want two.
-    LDBIcon:Register(ns.name, obj, ns.db.minimap)
+    LDBIcon:Register(ns.name, obj, ns.global.minimap)
 
     ns.ldbObject = obj
     ns.ldbIcon = LDBIcon
@@ -137,8 +137,8 @@ function ns.Minimap_Init()
         if mouseButton == "RightButton" then
             ns.db.bars.locked = not ns.db.bars.locked
             ns.Bars_UpdateLock()
-            print("|cff33ff99HotsNDots|r: bars " ..
-                (ns.db.bars.locked and "locked." or "unlocked \226\128\147 drag to move."))
+            print(ns.BRAND .. ": " ..
+                (ns.db.bars.locked and ns.L.msgBarsLocked or ns.L.msgBarsUnlocked))
         else
             ns.OpenConfig()
         end
@@ -154,9 +154,9 @@ function ns.Minimap_Init()
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("|cff33ff99HotsNDots|r")
-        GameTooltip:AddLine("Left click: settings", 1, 1, 1)
-        GameTooltip:AddLine("Right click: lock/unlock bars", 1, 1, 1)
-        GameTooltip:AddLine("Drag: move this button", 1, 1, 1)
+        GameTooltip:AddLine(ns.L.ttLeftSettings, 1, 1, 1)
+        GameTooltip:AddLine(ns.L.ttRightLock, 1, 1, 1)
+        GameTooltip:AddLine(ns.L.ttDrag, 1, 1, 1)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -176,7 +176,7 @@ end
 function HotsNDots_OnCompartmentEnter(_, menuButtonFrame)
     GameTooltip:SetOwner(menuButtonFrame, "ANCHOR_LEFT")
     GameTooltip:AddLine("|cff33ff99HotsNDots|r")
-    GameTooltip:AddLine("Click: open settings", 1, 1, 1)
+    GameTooltip:AddLine(ns.L.ttClickSettings, 1, 1, 1)
     GameTooltip:Show()
 end
 

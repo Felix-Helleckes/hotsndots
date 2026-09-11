@@ -2,7 +2,7 @@
 ## Title: |cff33ff99HotsNDots|r
 ## Notes: Shows only YOUR own DoTs (on enemies) and HoTs/buffs (on friends) - large on nameplates with a seconds countdown, and as freely movable bars.
 ## Author: Florian
-## Version: 1.4.1
+## Version: 1.5.0
 ## SavedVariables: HotsNDotsDB
 ## IconTexture: Interface\AddOns\HotsNDots\Icon.tga
 ## AddonCompartmentFunc: HotsNDots_OnCompartmentClick
@@ -13,7 +13,10 @@
 ## X-Website: https://www.curseforge.com/wow/addons/hotsndots
 # ## X-Curse-Project-ID: 000000   (fill in after creating the CurseForge project)
 
+Locale.lua
 Core.lua
+Profiles.lua
+Media.lua
 Nameplates.lua
 Bars.lua
 Minimap.lua

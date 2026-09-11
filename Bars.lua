@@ -23,74 +23,211 @@ local GROUPS = {
 }
 
 --------------------------------------------------------------------
--- One bar
---  Called by the container right after it creates a button, and only
---  then: from here on the button belongs to the game.
+-- Bar styles
+--  A preset only ever SHOWS, MOVES or RECOLOURS regions that already
+--  exist. It may never add one: from the moment initializeFrame returns
+--  the button belongs to the game, and a region created later would be a
+--  new child on a frame we no longer own. So all four presets are
+--  different arrangements of the same five pieces - which is also why
+--  switching between them is a restyle and not a rebuild.
 --------------------------------------------------------------------
-local function BuildBar(group, button)
+-- The KEY is what gets stored and must never be translated; the label
+-- is only ever shown. Both come from the same table, so the dropdown
+-- can match on the label without the two drifting apart.
+local PRESETS = {
+    { key = "default",   label = ns.L.presetDefault,   icon = true,  iconRight = false, name = true  },
+    { key = "compact",   label = ns.L.presetCompact,   icon = true,  iconRight = false, name = false },
+    { key = "iconRight", label = ns.L.presetIconRight, icon = true,  iconRight = true,  name = true  },
+    { key = "noIcon",    label = ns.L.presetNoIcon,    icon = false, iconRight = false, name = true  },
+}
+ns.BarPresets = PRESETS
+
+function ns.BarPresetFor(key)
+    for _, p in ipairs(PRESETS) do
+        if p.key == key then return p end
+    end
+    return PRESETS[1]
+end
+
+-- The colour of a row is per profile now; the numbers on the group stay
+-- as the fallback for a save that predates the setting.
+function ns.BarColor(group)
     local cfg = ns.db.bars
-    local style = { button = button, group = group }
+    local c = (group.key == "hots") and cfg.colorHot or cfg.colorDot
+    if type(c) ~= "table" then return group.r, group.g, group.b end
+    return c.r or group.r, c.g or group.g, c.b or group.b
+end
 
-    button:SetSize(cfg.width, cfg.height)
-    button:EnableMouse(false)
+-- Media.lua can be missing for one session after an update that was
+-- installed while the game was running (see the note in Core.lua). A row
+-- that throws here would be built by the game's own container code, so
+-- it is not a caught error - it is a bar that never appears.
+local function TexturePath(name)
+    if ns.TexturePath then return ns.TexturePath(name) end
+    return [[Interface\TargetingFrame\UI-StatusBar]]
+end
 
-    -- icon on the left, inside the row
-    style.iconBorder = button:CreateTexture(nil, "BACKGROUND")
+local function FontPath(name)
+    if ns.FontPath then return ns.FontPath(name) end
+    return ns.FONT_PATH
+end
+
+--------------------------------------------------------------------
+-- The regions of one row
+--  Split out of BuildBar so the options screen can build a PREVIEW row
+--  from the same code. Two implementations of "what a bar looks like"
+--  would drift, and the one that drifts is the preview - which is the
+--  one the player believes.
+--------------------------------------------------------------------
+function ns.Bars_CreateRow(parent, group)
+    local style = { button = parent, group = group }
+
+    style.iconBorder = parent:CreateTexture(nil, "BACKGROUND")
     style.iconBorder:SetColorTexture(0, 0, 0, 1)
 
-    style.icon = button:CreateTexture(nil, "ARTWORK")
-    style.icon:SetPoint("TOPLEFT", 0, 0)
-    style.icon:SetSize(cfg.height, cfg.height)
+    style.icon = parent:CreateTexture(nil, "ARTWORK")
     style.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     style.iconBorder:SetPoint("TOPLEFT", style.icon, "TOPLEFT", -1.5, 1.5)
     style.iconBorder:SetPoint("BOTTOMRIGHT", style.icon, "BOTTOMRIGHT", 1.5, -1.5)
-    button:SetIcon(style.icon)
 
-    -- the bar itself fills whatever is left of the row
-    local bar = CreateFrame("StatusBar", nil, button)
-    bar:SetPoint("TOPLEFT", style.icon, "TOPRIGHT", 2, 0)
-    bar:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    bar:SetStatusBarColor(group.r, group.g, group.b)
+    local bar = CreateFrame("StatusBar", nil, parent)
+    bar:SetStatusBarTexture([[Interface\TargetingFrame\UI-StatusBar]])
     style.bar = bar
 
     style.barBG = bar:CreateTexture(nil, "BACKGROUND")
     style.barBG:SetAllPoints()
     style.barBG:SetColorTexture(0, 0, 0, 0.6)
 
-    button:SetDurationBar(bar, {
-        direction     = ns.BAR_DIR_REMAINING,
-        interpolation = ns.BAR_INTERP,
-    })
-
     -- text above the bar texture
-    local textLayer = CreateFrame("Frame", nil, button)
+    local textLayer = CreateFrame("Frame", nil, parent)
     textLayer:SetAllPoints()
     textLayer:SetFrameLevel(bar:GetFrameLevel() + 1)
     style.textLayer = textLayer
 
     style.time = textLayer:CreateFontString(nil, "OVERLAY")
-    style.time:SetPoint("RIGHT", bar, "RIGHT", -3, 0)
-    style.time:SetJustifyH("RIGHT")
-    ns.SetFont(style.time, cfg.fontSize)
     style.time:SetTextColor(1, 1, 1)
-    button:SetDurationText(style.time)
 
     style.name = textLayer:CreateFontString(nil, "OVERLAY")
-    style.name:SetPoint("LEFT", bar, "LEFT", 4, 0)
-    style.name:SetPoint("RIGHT", bar, "RIGHT", -(TIME_COLUMN + 4), 0)
-    style.name:SetJustifyH("LEFT")
     style.name:SetWordWrap(false)
-    ns.SetFont(style.name, cfg.fontSize)
     style.name:SetTextColor(1, 1, 1)
+
+    style.count = textLayer:CreateFontString(nil, "OVERLAY")
+    style.count:SetTextColor(1, 1, 1)
+
+    return style
+end
+
+--------------------------------------------------------------------
+-- Apply the current style to one row
+--  Touches nothing but our own regions, so the options screen can call
+--  it on a preview row and the restyle path on a real one.
+--------------------------------------------------------------------
+function ns.Bars_ApplyRowStyle(style)
+    local cfg    = ns.db.bars
+    local preset = ns.BarPresetFor(cfg.style)
+    local font   = FontPath(cfg.font)
+
+    style.button:SetSize(cfg.width, cfg.height)
+
+    -- icon
+    style.icon:ClearAllPoints()
+    style.icon:SetSize(cfg.height, cfg.height)
+    if preset.icon then
+        local corner = preset.iconRight and "TOPRIGHT" or "TOPLEFT"
+        style.icon:SetPoint(corner, style.button, corner, 0, 0)
+        style.icon:Show()
+        style.iconBorder:Show()
+    else
+        -- The game keeps writing the icon texture in; it is simply not
+        -- drawn. Hiding beats un-registering: SetIcon happens once, on a
+        -- button we are only allowed to touch that one time.
+        style.icon:SetPoint("TOPLEFT", style.button, "TOPLEFT", 0, 0)
+        style.icon:Hide()
+        style.iconBorder:Hide()
+    end
+
+    -- the bar takes whatever the icon leaves
+    style.bar:ClearAllPoints()
+    if not preset.icon then
+        style.bar:SetPoint("TOPLEFT", style.button, "TOPLEFT", 0, 0)
+        style.bar:SetPoint("BOTTOMRIGHT", style.button, "BOTTOMRIGHT", 0, 0)
+    elseif preset.iconRight then
+        style.bar:SetPoint("TOPLEFT", style.button, "TOPLEFT", 0, 0)
+        style.bar:SetPoint("BOTTOMRIGHT", style.icon, "BOTTOMLEFT", -2, 0)
+    else
+        style.bar:SetPoint("TOPLEFT", style.icon, "TOPRIGHT", 2, 0)
+        style.bar:SetPoint("BOTTOMRIGHT", style.button, "BOTTOMRIGHT", 0, 0)
+    end
+
+    -- Texture FIRST, then colour: SetStatusBarTexture replaces the
+    -- texture object, and a colour set before it goes with the old one.
+    style.bar:SetStatusBarTexture(TexturePath(cfg.texture))
+    style.bar:SetStatusBarColor(ns.BarColor(style.group))
+
+    -- texts
+    style.name:ClearAllPoints()
+    style.time:ClearAllPoints()
+    style.count:ClearAllPoints()
+    if preset.name then
+        style.name:Show()
+        style.name:SetPoint("LEFT", style.bar, "LEFT", 4, 0)
+        style.name:SetPoint("RIGHT", style.bar, "RIGHT", -(TIME_COLUMN + 4), 0)
+        style.name:SetJustifyH("LEFT")
+        style.time:SetPoint("RIGHT", style.bar, "RIGHT", -3, 0)
+        style.time:SetJustifyH("RIGHT")
+    else
+        -- With no name the seconds are the only thing on the bar, and a
+        -- number pinned to the far right of an otherwise empty bar reads
+        -- as left over rather than as the point of the row.
+        style.name:Hide()
+        style.time:SetPoint("CENTER", style.bar, "CENTER", 0, 0)
+        style.time:SetJustifyH("CENTER")
+    end
+
+    -- Stacks live on the icon, and have to move when there is none: a
+    -- region anchored to a hidden icon still sits where the icon would
+    -- be, which is on top of the bar.
+    if preset.icon then
+        style.count:SetPoint("BOTTOMRIGHT", style.icon, "BOTTOMRIGHT", 1, -1)
+    else
+        style.count:SetPoint("RIGHT", style.time, "LEFT", -4, 0)
+    end
+
+    ns.SetFont(style.name,  cfg.fontSize, nil, font)
+    ns.SetFont(style.time,  cfg.fontSize, nil, font)
+    ns.SetFont(style.count, cfg.fontSize, nil, font)
+end
+
+--------------------------------------------------------------------
+-- One bar
+--  Called by the container right after it creates a button, and only
+--  then: from here on the button belongs to the game.
+--------------------------------------------------------------------
+local function BuildBar(group, button)
+    local cfg = ns.db.bars
+    local style = ns.Bars_CreateRow(button, group)
+
+    button:EnableMouse(false)
+
+    -- Style FIRST, then hand the regions over. The predecessor of this
+    -- build sized and fonted every region before registering it, and a
+    -- font string that is handed to the game without a font is not a
+    -- difference worth risking on a button we may not touch again.
+    ns.Bars_ApplyRowStyle(style)
+
+    -- This is the only moment we may register, so everything the game
+    -- might ever have to fill goes over now - including the pieces the
+    -- current style hides.
+    button:SetIcon(style.icon)
+    button:SetDurationBar(style.bar, {
+        direction     = ns.BAR_DIR_REMAINING,
+        interpolation = ns.BAR_INTERP,
+    })
+    button:SetDurationText(style.time)
     button:SetSpellName(style.name)
 
-    -- stacks on the icon. Without a formatter the game only writes a
-    -- number at 2 or more applications - real stacks only.
-    style.count = textLayer:CreateFontString(nil, "OVERLAY")
-    style.count:SetPoint("BOTTOMRIGHT", style.icon, "BOTTOMRIGHT", 1, -1)
-    ns.SetFont(style.count, cfg.fontSize)
-    style.count:SetTextColor(1, 1, 1)
+    -- stacks. Without a formatter the game only writes a number at 2 or
+    -- more applications - real stacks only.
     if cfg.showStacks then
         button:SetApplicationCount(style.count)
     end
@@ -135,6 +272,19 @@ local function ApplyLayout()
 end
 
 --------------------------------------------------------------------
+-- Anchor position
+--  The bar position is part of the profile, so a profile switch has to
+--  move the anchor as well - that is the whole point of having a layout
+--  per specialization. Split out of Bars_Init for exactly that reason.
+--------------------------------------------------------------------
+function ns.Bars_ApplyPosition()
+    if not barAnchor then return end
+    local pt = ns.db.bars.point or ns.defaults.bars.point
+    barAnchor:ClearAllPoints()
+    barAnchor:SetPoint(pt.point, UIParent, pt.relPoint, pt.x, pt.y)
+end
+
+--------------------------------------------------------------------
 -- Lock / unlock
 --------------------------------------------------------------------
 function ns.Bars_UpdateLock()
@@ -172,11 +322,7 @@ function ns.Bars_Restyle()
 
     ns.TryRestyle(function()
         for _, style in ipairs(styleList) do
-            style.button:SetSize(cfg.width, cfg.height)
-            style.icon:SetSize(cfg.height, cfg.height)
-            ns.SetFont(style.name, cfg.fontSize)
-            ns.SetFont(style.time, cfg.fontSize)
-            ns.SetFont(style.count, cfg.fontSize)
+            ns.Bars_ApplyRowStyle(style)
             if cfg.showStacks then
                 style.button:SetApplicationCount(style.count)
             else
@@ -189,13 +335,57 @@ function ns.Bars_Restyle()
     ApplyLayout()
 end
 
+--------------------------------------------------------------------
+-- /hnd debug
+--  "The bars are gone" has half a dozen causes that look identical from
+--  the outside: the group is capped at zero by a filter, the container
+--  is disabled, the anchor was dragged off screen, the style hid the
+--  piece being looked for. This prints the ones that are answerable
+--  without seeing the screen.
+--------------------------------------------------------------------
+function ns.Bars_Debug()
+    local cfg = ns.db.bars
+    print(ns.BRAND .. ": bars " .. (cfg.enabled and "ON" or "OFF")
+        .. ", " .. #styleList .. " rows built"
+        .. ", container " .. (container and "yes" or "MISSING")
+        .. ", anchor " .. (barAnchor and "yes" or "MISSING")
+        .. ", " .. (cfg.locked and "locked" or "unlocked"))
+
+    if barAnchor then
+        local point, _, relPoint, x, y = barAnchor:GetPoint()
+        -- An anchor dragged past the edge is invisible and looks exactly
+        -- like "the addon is broken".
+        local onScreen = "on screen"
+        -- GetLeft answers nil until the frame has been laid out once, so
+        -- this is a check for "is it a number yet", not paranoia.
+        local left, bottom = tonumber(barAnchor:GetLeft()), tonumber(barAnchor:GetBottom())
+        if left and bottom then
+            local w, h = tonumber(UIParent:GetWidth()) or 0, tonumber(UIParent:GetHeight()) or 0
+            if left > w or bottom > h or left < -cfg.width or bottom < -cfg.height then
+                onScreen = "|cffff4444OFF SCREEN|r"
+            end
+        end
+        print(ns.BRAND .. ": anchor " .. tostring(point) .. "/" .. tostring(relPoint)
+            .. " at " .. math.floor(tonumber(x) or 0) .. "," .. math.floor(tonumber(y) or 0)
+            .. " (" .. onScreen .. ")")
+    end
+
+    print(ns.BRAND .. ": style " .. tostring(cfg.style)
+        .. ", texture " .. tostring(cfg.texture)
+        .. " -> " .. tostring(TexturePath(cfg.texture))
+        .. ", font " .. tostring(cfg.font))
+    print(ns.BRAND .. ": caps dots=" .. tostring(ns.GroupMaxFrames("HARMFUL", cfg.maxBars))
+        .. " hots=" .. tostring(ns.GroupMaxFrames("HELPFUL", cfg.maxBars))
+        .. " (0 means a filter switched that half off)")
+end
+
 function ns.Bars_Init()
     local cfg = ns.db.bars
 
     barAnchor = CreateFrame("Frame", "HotsNDotsBarAnchor", UIParent)
     ns.barAnchor = barAnchor
     barAnchor:SetSize(cfg.width, cfg.height)
-    barAnchor:SetPoint(cfg.point.point, UIParent, cfg.point.relPoint, cfg.point.x, cfg.point.y)
+    ns.Bars_ApplyPosition()
     barAnchor:SetMovable(true)
     barAnchor:SetClampedToScreen(true)
     barAnchor:RegisterForDrag("LeftButton")
@@ -215,7 +405,7 @@ function ns.Bars_Init()
 
     barAnchor.label = barAnchor:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     barAnchor.label:SetPoint("CENTER")
-    barAnchor.label:SetText("HotsNDots  \226\128\148  drag to move")
+    barAnchor.label:SetText(ns.L.barAnchorLabel)
 
     container = CreateFrame("AuraContainer", nil, barAnchor, "CustomAuraContainerTemplate")
     ns.barContainer = container

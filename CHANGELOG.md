@@ -1,5 +1,62 @@
 # HotsNDots – Changelog
 
+## 1.5.0
+- **Profiles, one per specialization.** What the display looks like – the
+  filters, the nameplate icons, the bars and where the bar anchor sits – now
+  lives in a profile, and every specialization picks its own. Switch spec and
+  the layout switches with it: a Resto Druid watching HoTs and the same
+  character as Balance watching two DoTs no longer have to share one
+  arrangement. There is always a **Default** profile, and a spec that has never
+  been given one follows it.
+- **Manage them under Options > AddOns > HotsNDots > Profiles.** One row per
+  spec of the character you are on, plus New, New from this one, Copy from...,
+  Reset and Delete. Profiles are shared by all your characters, so a layout
+  built on one is available on the next.
+- **Nothing is lost in the upgrade.** Your existing settings become the
+  Default profile and every spec keeps using them, so the first login after
+  updating looks exactly like the last one before it.
+- **The minimap button is deliberately not part of a profile.** Where your
+  button sits is a property of your UI, not of a spec layout – a button that
+  jumps around the minimap on every spec change would be a bug, not a feature.
+- New slash commands: `/hnd profiles` lists them, `/hnd profile <name>` puts
+  the spec you are in on one, `/hnd newprofile <name>` creates one and switches
+  to it. Profile names are case sensitive.
+- The settings screen now says which profile it is editing, and re-reads every
+  control when the profile changes underneath it – an options page showing the
+  values of the profile you just left would write them straight back.
+- **Bar styles.** Four presets — *Default*, *Compact (no name)*, *Icon on the
+  right* and *No icon* — plus a bar texture, a font and your own colours for
+  DoTs and HoTs. The Bar style page shows a live preview built from the same
+  code the real bars use, so it cannot show you something the bars will not do.
+- **Textures and fonts come from LibSharedMedia** when any addon has loaded it,
+  so a media pack you already own shows up in the list. Without it there is a
+  small built-in list of textures the game itself ships — HotsNDots still
+  requires nothing. What gets saved is the *name*, never the path: a pack that
+  is later removed falls back to the default instead of leaving a bar with a
+  dead texture, which draws nothing at all and explains nothing.
+- A style is part of the profile, so each specialization can look different.
+- **Deutsch, English, Français, Español.** The addon follows the client's own
+  language - there is no setting, because there is nothing to choose. A client
+  in any other language gets English, and so does any single string that has
+  not been translated yet: English is the base, everything else is an overlay
+  on top of it, so a gap is a fallback and never a blank.
+- **Updating while the game is running no longer breaks the addon.** 1.5.0 adds
+  new files, and a new file only arrives with a full client restart - `/reload`
+  re-runs the Lua the game already knows about but does not re-read the file
+  list. Until the restart the addon now keeps working on the old settings and
+  says so, instead of dying at load with nothing on screen.
+
+## 1.4.2
+- **The settings button no longer dies silently.** `Settings.OpenToCategory`
+  ends in `OpenSettingsPanel()`, which is a protected function: the game
+  refuses it during combat, and refuses it outright once any other addon has
+  tainted the settings path. A blocked action is not a Lua error, so nothing
+  could catch it – the click just did nothing, and the error log blamed
+  HotsNDots. It now bails out early in combat, and otherwise checks a frame
+  later whether the panel actually opened; if it did not, it says so and points
+  at ESC > Options > AddOns > HotsNDots. All four ways in (minimap button,
+  addon compartment, `/hnd`, the built-in button) go through the same place.
+
 ## 1.4.1
 - **Permanent DoTs are visible again.** "Hide auras without a timer" was one
   switch for both kinds, and it filtered debuffs as well - so an Affliction

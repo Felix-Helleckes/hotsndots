@@ -17,6 +17,7 @@ ignore:
   - HotsNDots-logo.png
   - HotsNDots.zip
   - build.ps1
+  - tests
   - .git
   - .github
   - .gitignore
