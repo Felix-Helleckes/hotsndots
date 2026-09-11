@@ -117,3 +117,11 @@ Midnight 12.0 made aura fields (`duration`, `expirationTime`, `icon`, `name`, `a
 ## 📜 License
 
 MIT — see [LICENSE](LICENSE). Contributions welcome.
+
+## Support
+
+HotsNDots remains fully free. If it saves you time in combat, you can support
+its ongoing maintenance through the optional **Donate** link on the
+[HotsNDots CurseForge project page](https://www.curseforge.com/wow/addons/hotsndots).
+Donations are never requested in-game and do not unlock or restrict any addon
+functionality.
