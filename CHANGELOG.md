@@ -1,5 +1,12 @@
 # HotsNDots – Changelog
 
+## 1.5.1
+- **WoW Forever.** HotsNDots now loads in the WoW Forever client
+  (interface 16001), which runs the same addon API as retail. One package
+  serves both: the .toc lists retail and Forever side by side.
+- The retail .toc now also lists 12.1.5 (120105), so the addon is no longer
+  flagged as out of date there.
+
 ## 1.5.0
 - **Profiles, one per specialization.** What the display looks like – the
   filters, the nameplate icons, the bars and where the bar anchor sits – now
