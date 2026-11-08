@@ -417,5 +417,34 @@ check("the minimap button still gets built",
       end)()"""))
 step(lua, "and the slash commands do not throw", 'SlashCmdList["HOTSNDOTS"]("bars")')
 
+# The WoW Forever client has GetNumSpecializations() but no global
+# GetSpecializationInfo(); 1.5.1 called it unguarded and the Profiles page
+# died with "attempt to call a nil value" (Options.lua:606).
+print("\n9. WoW Forever: spec API only partly there")
+lua = newrt()
+lua.execute("GetSpecializationInfo = nil; GetSpecialization = nil")
+lua.globals().HotsNDotsDB = None
+step(lua, "ADDON_LOADED", 'fire("ADDON_LOADED", "HotsNDots")')
+step(lua, "PLAYER_LOGIN", 'fire("PLAYER_LOGIN")')
+check("no failure was recorded",
+      lua.eval("HotsNDotsDB.lastError == nil"), lua.eval("HotsNDotsDB.lastError and HotsNDotsDB.lastError.message"))
+check("the Profiles page was still registered",
+      "subcategory:Profiles" in list(lua.globals().CALLS.values()))
+check("the player is on the no-spec slot", lua.eval("NS.SpecID()") == 0)
+
+print("\n10. the moved API (C_SpecializationInfo) is used when it is there")
+lua = newrt()
+lua.execute("""
+    C_SpecializationInfo = {
+        GetSpecialization = function() return 2 end,
+        GetSpecializationInfo = function(i) return SPECS[i], SPEC_NAMES[i] end,
+    }
+    GetSpecializationInfo = nil; GetSpecialization = nil
+""")
+lua.globals().HotsNDotsDB = None
+step(lua, "ADDON_LOADED", 'fire("ADDON_LOADED", "HotsNDots")')
+step(lua, "PLAYER_LOGIN", 'fire("PLAYER_LOGIN")')
+check("the spec comes from C_SpecializationInfo", lua.eval("NS.SpecID() == SPECS[2]"))
+
 print("\n" + ("ALL PASS" if not fails else "FAILURES:\n  - " + "\n  - ".join(fails)))
 sys.exit(1 if fails else 0)

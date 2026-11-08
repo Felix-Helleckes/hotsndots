@@ -44,11 +44,34 @@ ns.CharKey = CharKey
 -- The spec ID, not the index. 0 = no spec (fresh character, or the API
 -- answering before talent data is around) - that is a legitimate slot
 -- and gets its own profile assignment like any other.
+-- The spec API moved into C_SpecializationInfo, and the WoW Forever
+-- client only has some of the old globals (GetNumSpecializations is
+-- there, GetSpecializationInfo is not). Every call goes through these
+-- two helpers, which take whichever exists and answer nil otherwise.
+function ns.GetSpecIndex()
+    local CSI = C_SpecializationInfo
+    local fn = (CSI and CSI.GetSpecialization) or GetSpecialization
+    return fn and fn() or nil
+end
+
+-- Returns specID, name for a spec index (1..n), or nil.
+function ns.GetSpecInfo(index)
+    local CSI = C_SpecializationInfo
+    if CSI and CSI.GetSpecializationInfo then
+        local id, name = CSI.GetSpecializationInfo(index)
+        if id then return id, name end
+    end
+    if GetSpecializationInfo then
+        local id, name = GetSpecializationInfo(index)
+        return id, name
+    end
+    return nil
+end
+
 local function SpecID()
-    if not GetSpecialization then return 0 end
-    local index = GetSpecialization()
+    local index = ns.GetSpecIndex()
     if not index then return 0 end
-    local id = GetSpecializationInfo(index)
+    local id = ns.GetSpecInfo(index)
     return id or 0
 end
 ns.SpecID = SpecID

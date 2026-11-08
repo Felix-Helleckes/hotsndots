@@ -601,15 +601,15 @@ function ns.Options_BuildProfilePanel()
     end
 
     local numSpecs = (GetNumSpecializations and GetNumSpecializations()) or 0
-    if numSpecs > 0 then
-        for i = 1, numSpecs do
-            local id, name = GetSpecializationInfo(i)
-            if id then AddRow(id, name or format(L.specNumbered, i)) end
-        end
-    else
-        -- A low-level character has no specialization yet. That is a real
-        -- slot (ID 0) and gets a row like any other, rather than an empty
-        -- panel that reads as broken.
+    for i = 1, numSpecs do
+        local id, name = ns.GetSpecInfo(i)
+        if id then AddRow(id, name or format(L.specNumbered, i)) end
+    end
+    if #rows == 0 then
+        -- No specialization to list: a low-level character, or a client
+        -- (WoW Forever) whose spec API does not answer. Spec 0 is a real
+        -- slot and gets a row like any other, rather than an empty panel
+        -- that reads as broken.
         AddRow(0, ns.SpecName(0))
     end
 

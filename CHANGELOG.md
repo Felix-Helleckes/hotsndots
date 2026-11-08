@@ -1,5 +1,13 @@
 # HotsNDots – Changelog
 
+## 1.5.2
+- **Fix for WoW Forever:** opening the settings threw *"Options.lua:606:
+  attempt to call a nil value"* and the Profiles page stayed empty. The
+  Forever client has `GetNumSpecializations()` but no global
+  `GetSpecializationInfo()`. Every spec lookup now uses
+  `C_SpecializationInfo` where it exists, falls back to the old globals, and
+  shows the no-spec slot when neither answers.
+
 ## 1.5.1
 - **WoW Forever.** HotsNDots now loads in the WoW Forever client
   (interface 16001), which runs the same addon API as retail. One package
