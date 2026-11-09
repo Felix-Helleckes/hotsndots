@@ -471,6 +471,9 @@ function ns.Options_SubPanels()
     if ns.TexturePath and ns.BarPresets then
         out[#out + 1] = ns.Options_BuildStylePanel()
     end
+    if ns.SelfBar_Init then
+        out[#out + 1] = ns.Options_BuildSelfPanel()
+    end
     if ns.Profiles_List then
         out[#out + 1] = ns.Options_BuildProfilePanel()
     end
@@ -825,6 +828,93 @@ function ns.Options_BuildStylePanel()
     return panel
 end
 
+--------------------------------------------------------------------
+-- "Your own HoTs" page (the self bar)
+--  Its own page for the same reason as the bar style: the main page is
+--  full and a canvas panel does not scroll.
+--------------------------------------------------------------------
+local function RestyleSelf()
+    if ns.SelfBar_Restyle then ns.SelfBar_Restyle() end
+end
+
+local function UpdateSelf()
+    if ns.SelfBar_Update then ns.SelfBar_Update() end
+end
+
+function ns.Options_BuildSelfPanel()
+    local panel = CreateFrame("Frame")
+    panel.name = L.pageSelf
+    panel:SetScript("OnHide", CloseMenu)
+    ns.selfPanel = panel
+
+    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText(ns.BRAND .. " - " .. L.pageSelf)
+
+    local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+    sub:SetWidth(560); sub:SetJustifyH("LEFT")
+    sub:SetText(L.selfIntro)
+
+    local where = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    where:SetPoint("TOPLEFT", 24, -100)
+    where:SetJustifyH("LEFT")
+    local function updateWhere()
+        where:SetText(format(L.editingProfile, "|cff33ff99" .. tostring(ns.activeProfile) .. "|r"))
+    end
+    updateWhere()
+    refreshers[#refreshers + 1] = updateWhere
+
+    CreateCheckbox(panel, L.cbSelf, 24, -124,
+        function() return ns.db.selfbar.enabled end,
+        function(v) ns.db.selfbar.enabled = v; UpdateSelf() end)
+
+    CreateCheckbox(panel, L.cbSelfLock, 24, -150,
+        function() return ns.db.selfbar.locked end,
+        function(v) ns.db.selfbar.locked = v; UpdateSelf() end)
+
+    CreateCheckbox(panel, L.cbGrowLeft, 24, -176,
+        function() return ns.db.selfbar.growLeft end,
+        function(v) ns.db.selfbar.growLeft = v; UpdateSelf() end)
+
+    CreateCheckbox(panel, L.cbStacks, 24, -202,
+        function() return ns.db.selfbar.showStacks end,
+        function(v) ns.db.selfbar.showStacks = v; RestyleSelf() end)
+
+    CreateCheckbox(panel, L.cbSwipe, 24, -228,
+        function() return ns.db.selfbar.showSwipe end,
+        function(v) ns.db.selfbar.showSwipe = v; RestyleSelf() end)
+
+    CreateSlider(panel, L.slIconSize, 40, -280, 16, 64, 1,
+        function() return ns.db.selfbar.size end,
+        function(v) ns.db.selfbar.size = v; RestyleSelf() end)
+
+    CreateSlider(panel, L.slSecondsFont, 40, -328, 8, 36, 1,
+        function() return ns.db.selfbar.timerFontSize end,
+        function(v) ns.db.selfbar.timerFontSize = v; RestyleSelf() end)
+
+    CreateSlider(panel, L.slSpacing, 346, -280, 0, 20, 1,
+        function() return ns.db.selfbar.spacing end,
+        function(v) ns.db.selfbar.spacing = v; UpdateSelf() end)
+
+    CreateSlider(panel, L.slMaxIcons, 346, -328, 1, 16, 1,
+        function() return ns.db.selfbar.maxIcons end,
+        function(v) ns.db.selfbar.maxIcons = v; UpdateSelf() end)
+
+    AddButton(panel, L.btnResetPos, 24, -376, 200, function()
+        ns.db.selfbar.point = ns.DeepCopy and ns.DeepCopy(ns.defaults.selfbar.point)
+            or { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 }
+        if ns.SelfBar_ApplyPosition then ns.SelfBar_ApplyPosition() end
+    end)
+
+    local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    hint:SetPoint("TOPLEFT", 24, -412)
+    hint:SetWidth(560); hint:SetJustifyH("LEFT")
+    hint:SetText(L.selfHint)
+
+    return panel
+end
+
 -- resolved through L at call time, not captured: the route is a sentence
 
 -- Every way into the settings - minimap button, addon compartment, /hnd -
@@ -926,16 +1016,31 @@ SlashCmdList["HOTSNDOTS"] = function(msg)
     cmd  = strlower(cmd or "")
     rest = strtrim(rest or "")
 
+    -- lock/unlock covers everything that can be dragged: the bars and,
+    -- if it exists in this session, the self bar.
     if cmd == "lock" then
         ns.db.bars.locked = true
         ns.Bars_UpdateLock()
+        if ns.db.selfbar then ns.db.selfbar.locked = true end
+        if ns.SelfBar_UpdateLock then ns.SelfBar_UpdateLock() end
         ns.Options_Refresh()
         print(ns.BRAND .. ": " .. L.msgBarsLocked)
     elseif cmd == "unlock" then
         ns.db.bars.locked = false
         ns.Bars_UpdateLock()
+        if ns.db.selfbar then ns.db.selfbar.locked = false end
+        if ns.SelfBar_UpdateLock then ns.SelfBar_UpdateLock() end
         ns.Options_Refresh()
         print(ns.BRAND .. ": " .. L.msgBarsUnlocked)
+    elseif cmd == "self" then
+        if not ns.SelfBar_Update then
+            print(ns.BRAND .. ": " .. L.msgSelfLate)
+            return
+        end
+        ns.db.selfbar.enabled = not ns.db.selfbar.enabled
+        ns.SelfBar_Update()
+        ns.Options_Refresh()
+        print(ns.BRAND .. ": " .. format(L.msgSelf, ns.db.selfbar.enabled and L.on or L.off))
     elseif cmd == "nameplates" then
         ns.db.nameplates.enabled = not ns.db.nameplates.enabled
         ns.Nameplates_RefreshAll()
@@ -979,6 +1084,7 @@ SlashCmdList["HOTSNDOTS"] = function(msg)
         print(ns.BRAND .. ": bar filter = " .. ns.FilterString("HELPFUL"))
         if ns.Nameplates_Debug then ns.Nameplates_Debug() end
         if ns.Bars_Debug then ns.Bars_Debug() end
+        if ns.SelfBar_Debug and ns.db.selfbar then ns.SelfBar_Debug() end
 
         -- The one thing worth having: what actually broke at login, kept
         -- across reloads so it can still be read (and copied out of the

@@ -106,6 +106,20 @@ local EN = {
     presetCompact    = "Compact (no name)",
     presetIconRight  = "Icon on the right",
     presetNoIcon     = "No icon",
+    -- ---------------- self bar page ----------------
+    pageSelf         = "Your own HoTs",
+    selfIntro        = "Your own HoTs and buffs on YOURSELF, as a movable row of icons in the style of Blizzard's cooldown manager:"
+                    .. " icon, swipe and the seconds in the middle. Uses the same filters as everything else"
+                    .. " (\"Hide buffs without a timer\" keeps your permanent raid buffs out).",
+    cbSelf           = "Show the row of your own HoTs",
+    cbSelfLock       = "Lock the row (not movable)",
+    cbGrowLeft       = "Grow to the left",
+    slSpacing        = "Spacing",
+    btnResetPos      = "Reset position",
+    selfHint         = "Drag the green square to move the row. /hnd self switches it on and off, /hnd lock and /hnd unlock work for the bars and this row together.",
+    selfAnchorLabel  = "Your HoTs \226\128\148 drag",
+    msgSelf          = "row of your own HoTs %s",
+    msgSelfLate      = "the row of your own HoTs arrives after a restart - please restart WoW to finish the update.",
 
     -- ---------------- messages ----------------
     on               = "ON",
@@ -222,6 +236,20 @@ translations.deDE = {
     presetCompact    = "Kompakt (ohne Namen)",
     presetIconRight  = "Symbol rechts",
     presetNoIcon     = "Ohne Symbol",
+    -- ---------------- self bar page ----------------
+    pageSelf         = "Eigene HoTs",
+    selfIntro        = "Deine eigenen HoTs und Buffs AUF DIR SELBST, als verschiebbare Symbolreihe im Stil von Blizzards Abklingzeitenmanager:"
+                    .. " Symbol, Ablauf-Animation und die Sekunden in der Mitte. Nutzt dieselben Filter wie alles andere"
+                    .. " (\"Buffs ohne Laufzeit ausblenden\" hält deine dauerhaften Raidbuffs heraus).",
+    cbSelf           = "Reihe der eigenen HoTs anzeigen",
+    cbSelfLock       = "Reihe sperren (nicht verschiebbar)",
+    cbGrowLeft       = "Nach links wachsen",
+    slSpacing        = "Abstand",
+    btnResetPos      = "Position zurücksetzen",
+    selfHint         = "Zum Verschieben das grüne Quadrat ziehen. /hnd self schaltet die Reihe ein und aus, /hnd lock und /hnd unlock gelten für die Leisten und diese Reihe zusammen.",
+    selfAnchorLabel  = "Eigene HoTs \226\128\148 ziehen",
+    msgSelf          = "Reihe der eigenen HoTs %s",
+    msgSelfLate      = "die Reihe der eigenen HoTs kommt erst nach einem Neustart - bitte WoW neu starten, um das Update abzuschließen.",
 
     on               = "AN",
     off              = "AUS",
@@ -334,6 +362,19 @@ translations.frFR = {
     presetCompact    = "Compact (sans nom)",
     presetIconRight  = "Icône à droite",
     presetNoIcon     = "Sans icône",
+    -- ---------------- self bar page ----------------
+    pageSelf         = "Vos HoTs",
+    selfIntro        = "Vos propres HoTs et buffs SUR VOUS-MÊME, en rangée d'icônes déplaçable dans le style du gestionnaire de temps de recharge de Blizzard :"
+                    .. " icône, balayage et les secondes au centre. Utilise les mêmes filtres que le reste.",
+    cbSelf           = "Afficher la rangée de vos HoTs",
+    cbSelfLock       = "Verrouiller la rangée (non déplaçable)",
+    cbGrowLeft       = "S'étendre vers la gauche",
+    slSpacing        = "Espacement",
+    btnResetPos      = "Réinitialiser la position",
+    selfHint         = "Faites glisser le carré vert pour déplacer la rangée. /hnd self l'active ou la désactive, /hnd lock et /hnd unlock valent pour les barres et cette rangée.",
+    selfAnchorLabel  = "Vos HoTs \226\128\148 glisser",
+    msgSelf          = "rangée de vos HoTs %s",
+    msgSelfLate      = "la rangée de vos HoTs arrive après un redémarrage - veuillez redémarrer WoW pour terminer la mise à jour.",
 
     on               = "ACTIVÉ",
     off              = "DÉSACTIVÉ",
@@ -446,6 +487,19 @@ translations.esES = {
     presetCompact    = "Compacto (sin nombre)",
     presetIconRight  = "Icono a la derecha",
     presetNoIcon     = "Sin icono",
+    -- ---------------- self bar page ----------------
+    pageSelf         = "Tus HoTs",
+    selfIntro        = "Tus propios HoTs y beneficios SOBRE TI, como una fila de iconos móvil al estilo del gestor de reutilización de Blizzard:"
+                    .. " icono, barrido y los segundos en el centro. Usa los mismos filtros que todo lo demás.",
+    cbSelf           = "Mostrar la fila de tus HoTs",
+    cbSelfLock       = "Bloquear la fila (no móvil)",
+    cbGrowLeft       = "Crecer hacia la izquierda",
+    slSpacing        = "Espaciado",
+    btnResetPos      = "Restablecer posición",
+    selfHint         = "Arrastra el cuadrado verde para mover la fila. /hnd self la activa o desactiva, /hnd lock y /hnd unlock valen para las barras y esta fila.",
+    selfAnchorLabel  = "Tus HoTs \226\128\148 arrastra",
+    msgSelf          = "fila de tus HoTs %s",
+    msgSelfLate      = "la fila de tus HoTs llega tras reiniciar - reinicia WoW para terminar la actualización.",
 
     on               = "ACTIVADO",
     off              = "DESACTIVADO",

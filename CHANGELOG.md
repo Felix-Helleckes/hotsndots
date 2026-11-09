@@ -1,5 +1,22 @@
 # HotsNDots – Changelog
 
+## 1.6.0
+- **New: "Your own HoTs" – a second display for your HoTs and buffs on
+  YOURSELF.** A movable row of icons in the style of Blizzard's cooldown
+  manager: icon, swipe, the seconds in the middle and real stacks in the
+  corner. Like everything else in HotsNDots it is filled in by the game, so
+  it keeps working in combat. Retail and WoW Forever.
+- **Switch it on under Options > AddOns > HotsNDots > Your own HoTs**, or with
+  `/hnd self`. It is off by default, so the update does not put a new row on
+  anyone's screen unasked. Size, spacing, seconds font, max icons, growth to
+  the left, stacks and swipe are all adjustable, and it uses the same filters
+  as the rest ("Hide buffs without a timer" keeps permanent raid buffs out).
+- It is part of the profile, so every spec decides on its own whether the row
+  is shown and where it sits. `/hnd lock` and `/hnd unlock` now cover the bars
+  and the new row together.
+- **After updating, restart WoW once** – the new file is only picked up at
+  startup, `/reload` is not enough.
+
 ## 1.5.2
 - **Fix for WoW Forever:** opening the settings threw *"Options.lua:606:
   attempt to call a nil value"* and the Profiles page stayed empty. The

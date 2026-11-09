@@ -168,6 +168,23 @@ local defaults = {
         colorHot   = { r = 0.15, g = 0.60, b = 0.25 },
     },
 
+    -- Your own HoTs/buffs on YOURSELF, as a row of icons in the style of
+    -- Blizzard's cooldown manager (SelfBar.lua). Off by default so an
+    -- update does not put a new row on anyone's screen unasked.
+    selfbar = {
+        enabled       = false,
+        locked        = false,
+        size          = 36,
+        spacing       = 4,
+        maxIcons      = 8,
+        growLeft      = false,
+        timerFontSize = 15,
+        stackFontSize = 12,
+        showStacks    = true,  -- only ever shows real stacks (2+)
+        showSwipe     = true,
+        point         = { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 },
+    },
+
     minimap = {
         hide  = false,
         angle = 220,
@@ -268,6 +285,7 @@ end
 function ns.RestyleAll()
     if ns.Nameplates_Restyle then ns.Nameplates_Restyle() end
     if ns.Bars_Restyle      then ns.Bars_Restyle()      end
+    if ns.SelfBar_Restyle   then ns.SelfBar_Restyle()   end
 end
 
 --------------------------------------------------------------------
@@ -368,6 +386,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if ns.hasAuraContainers then
             SafeInit("Nameplates", ns.Nameplates_Init)
             SafeInit("Bars",       ns.Bars_Init)
+            SafeInit("SelfBar",    ns.SelfBar_Init)
         else
             print(BRAND .. ": " .. ns.L.msgNoContainer1)
             print(BRAND .. ": " .. ns.L.msgNoContainer2)

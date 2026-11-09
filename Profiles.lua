@@ -92,7 +92,7 @@ end
 -- up at the root of a profile table is left alone rather than deleted:
 -- a future setting must not be silently thrown away by an old copy of
 -- this list.
-local PROFILE_KEYS = { "filters", "nameplates", "bars" }
+local PROFILE_KEYS = { "filters", "nameplates", "bars", "selfbar" }
 
 local function NewProfile()
     local p = {}
@@ -288,6 +288,8 @@ local function PushProfileToDisplay()
     if ns.Bars_Restyle       then ns.Bars_Restyle()       end
     if ns.Bars_UpdateLock    then ns.Bars_UpdateLock()    end
     if ns.Nameplates_Restyle then ns.Nameplates_Restyle() end
+    if ns.SelfBar_ApplyPosition then ns.SelfBar_ApplyPosition() end
+    if ns.SelfBar_Restyle       then ns.SelfBar_Restyle()       end
 end
 ns.Profiles_PushToDisplay = PushProfileToDisplay
 

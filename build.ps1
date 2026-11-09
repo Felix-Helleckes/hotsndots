@@ -23,6 +23,7 @@ $include = @(
     'Media.lua',
     'Nameplates.lua',
     'Bars.lua',
+    'SelfBar.lua',
     'Minimap.lua',
     'Options.lua',
     'Icon.tga',

@@ -22,6 +22,7 @@ Works for **every class and spec**, for both **DoTs on enemies** and **HoTs/buff
 - **Filters.** Debuffs only, buffs only, hide crowd control, and hide auras that have no timer at all (your own raid buffs) so they stop taking up slots.
 - **Sits above or below the nameplate.** Blizzard's own nameplate auras are left alone: since 12.1 there is no way for an addon to hide them without tainting the nameplate, which breaks it. Turn them down in the game's Nameplate options if you want only these.
 - **Freely movable bars** for the current target — drag them anywhere, lock them in place.
+- **Your own HoTs on yourself** as a movable row of icons in the style of Blizzard's cooldown manager — icon, swipe and the seconds in the middle. Off by default; switch it on under *Options > AddOns > HotsNDots > Your own HoTs* or with `/hnd self`.
 - **Speaks your client's language.** German, English, French and Spanish (esES/esMX), picked from the game itself - no setting to find. Any other client language falls back to English.
 - **Bar styles.** Four presets (default, compact, icon on the right, no icon), a bar texture, a font and your own DoT/HoT colours, with a live preview. Textures and fonts come from **LibSharedMedia** if any addon has loaded it — otherwise from a small built-in list, so nothing has to be installed.
 - **A profile per specialization.** Filters, icon sizes, bar layout and the bar position live in a profile, and each spec picks its own — switch spec and the arrangement switches with it. There is always a **Default** profile; profiles are shared by all your characters. Manage them under *Options > AddOns > HotsNDots > Profiles*.
@@ -51,8 +52,9 @@ Works for **every class and spec**, for both **DoTs on enemies** and **HoTs/buff
 | Command | Action |
 |---|---|
 | `/hotsndots` or `/hnd` | Open the settings screen |
-| `/hnd unlock` | Unlock the bars (then drag them) |
-| `/hnd lock` | Lock the bars in place |
+| `/hnd unlock` | Unlock the bars and the HoT row (then drag them) |
+| `/hnd lock` | Lock the bars and the HoT row in place |
+| `/hnd self` | Toggle the row of your own HoTs on yourself |
 | `/hnd bars` | Toggle bars on/off |
 | `/hnd nameplates` | Toggle nameplate icons on/off |
 | `/hnd minimap` | Toggle the minimap button |

@@ -211,7 +211,7 @@ function flush() local p = PENDING; PENDING = {}; for _, fn in ipairs(p) do fn()
 """
 
 FILES = ["Locale.lua", "Core.lua", "Profiles.lua", "Media.lua", "Nameplates.lua",
-         "Bars.lua", "Minimap.lua", "Options.lua"]
+         "Bars.lua", "SelfBar.lua", "Minimap.lua", "Options.lua"]
 
 fails = []
 
@@ -445,6 +445,77 @@ lua.globals().HotsNDotsDB = None
 step(lua, "ADDON_LOADED", 'fire("ADDON_LOADED", "HotsNDots")')
 step(lua, "PLAYER_LOGIN", 'fire("PLAYER_LOGIN")')
 check("the spec comes from C_SpecializationInfo", lua.eval("NS.SpecID() == SPECS[2]"))
+
+# 1.6.0: a second display for your own HoTs ON YOURSELF, in the style of
+# the cooldown manager. It is one more init in PLAYER_LOGIN, one more key in
+# every profile, and one more page - each of which can take the others down.
+print("\n11. the self bar (your own HoTs on yourself)")
+lua = newrt()
+lua.globals().HotsNDotsDB = None
+step(lua, "ADDON_LOADED", 'fire("ADDON_LOADED", "HotsNDots")')
+step(lua, "PLAYER_LOGIN", 'fire("PLAYER_LOGIN")')
+calls = list(lua.globals().CALLS.values())
+check("no failure was recorded",
+      lua.eval("HotsNDotsDB.lastError == nil"), lua.eval("HotsNDotsDB.lastError and HotsNDotsDB.lastError.message"))
+check("its aura group was built", "AddAuraGroup:self" in calls, calls)
+check("it watches the player",
+      lua.eval("NS.selfContainer and NS.selfContainer.__unit") == "player",
+      lua.eval("NS.selfContainer and NS.selfContainer.__unit"))
+check("it is off on a fresh install", lua.eval("NS.db.selfbar.enabled") is False)
+check("the 'Your own HoTs' page was registered", "subcategory:Your own HoTs" in calls, calls)
+step(lua, "/hnd self switches it on", 'SlashCmdList["HOTSNDOTS"]("self")')
+check("and it is on", lua.eval("NS.db.selfbar.enabled") is True)
+step(lua, "/hnd unlock", 'SlashCmdList["HOTSNDOTS"]("unlock")')
+check("unlock reaches the self bar too", lua.eval("NS.db.selfbar.locked") is False)
+step(lua, "/hnd lock", 'SlashCmdList["HOTSNDOTS"]("lock")')
+check("lock reaches the self bar too", lua.eval("NS.db.selfbar.locked") is True)
+step(lua, "a restyle", "NS.SelfBar_Restyle(); NS.SelfBar_Update()")
+step(lua, "the page redraws", """
+    for _, f in ipairs(FRAMES) do
+        if f.name == "Your own HoTs" and f.__scripts.OnShow then f.__scripts.OnShow(f) end
+    end
+    NS.Options_RefreshUI()
+""")
+step(lua, "/hnd debug", 'SlashCmdList["HOTSNDOTS"]("debug")')
+printed = " ".join(list(lua.globals().PRINTED.values()))
+check("/hnd debug reports it", "self bar" in printed)
+
+# The setting is per profile, so each profile has its own row on/off and
+# its own position - a new profile starts from the defaults.
+step(lua, "a second profile", 'NS.Profiles_Create("Heal"); NS.Profiles_AssignCurrentSpec("Heal")')
+check("a new profile has its own self bar settings",
+      lua.eval("NS.db.selfbar ~= nil and NS.db.selfbar.enabled == false"))
+
+print("\n12. a pre-1.6 save gets the self bar settings")
+lua = newrt()
+lua.execute("""
+HotsNDotsDB = {
+    dbVersion = 4,
+    global = { minimap = { hide = false, angle = 220 } },
+    profiles = { Default = { filters = {}, nameplates = {}, bars = { width = 300 } } },
+    profileKeys = {},
+}
+""")
+step(lua, "ADDON_LOADED", 'fire("ADDON_LOADED", "HotsNDots")')
+step(lua, "PLAYER_LOGIN", 'fire("PLAYER_LOGIN")')
+check("the old profile gained a selfbar table",
+      lua.eval("type(NS.db.selfbar) == 'table' and NS.db.selfbar.size == 36"))
+check("and nothing else was touched", lua.eval("NS.db.bars.width") == 300)
+
+print("\n13. update mid-session, SelfBar.lua not loaded yet")
+lua = newrt(files=["Locale.lua", "Core.lua", "Profiles.lua", "Media.lua", "Nameplates.lua",
+                   "Bars.lua", "Minimap.lua", "Options.lua"])
+lua.globals().HotsNDotsDB = None
+step(lua, "ADDON_LOADED", 'fire("ADDON_LOADED", "HotsNDots")')
+step(lua, "PLAYER_LOGIN", 'fire("PLAYER_LOGIN")')
+check("no failure was recorded", lua.eval("HotsNDotsDB.lastError == nil"),
+      lua.eval("HotsNDotsDB.lastError and HotsNDotsDB.lastError.message"))
+calls = list(lua.globals().CALLS.values())
+check("no self bar page without the file", "subcategory:Your own HoTs" not in calls, calls)
+for cmd in ["self", "lock", "unlock", "debug"]:
+    step(lua, "/hnd " + cmd, 'SlashCmdList["HOTSNDOTS"]("%s")' % cmd)
+printed = " ".join(list(lua.globals().PRINTED.values()))
+check("/hnd self says to restart", "restart" in printed.lower(), printed[-160:])
 
 print("\n" + ("ALL PASS" if not fails else "FAILURES:\n  - " + "\n  - ".join(fails)))
 sys.exit(1 if fails else 0)
