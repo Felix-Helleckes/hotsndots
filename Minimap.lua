@@ -10,6 +10,19 @@
 
 local ADDON_NAME, ns = ...
 
+-- Right-click locks or unlocks EVERYTHING movable - the bars and the row
+-- of your own HoTs - the same as /hnd lock and /hnd unlock. The bars
+-- decide the direction, so a mixed state ends up all locked.
+local function ToggleLock()
+    local locked = not ns.db.bars.locked
+    ns.db.bars.locked = locked
+    ns.Bars_UpdateLock()
+    if ns.db.selfbar then ns.db.selfbar.locked = locked end
+    if ns.SelfBar_UpdateLock then ns.SelfBar_UpdateLock() end
+    if ns.Options_Refresh then ns.Options_Refresh() end
+    print(ns.BRAND .. ": " .. (locked and ns.L.msgBarsLocked or ns.L.msgBarsUnlocked))
+end
+
 local button
 
 --------------------------------------------------------------------
@@ -76,10 +89,7 @@ local function TryLibDBIcon()
         icon = "Interface\\AddOns\\HotsNDots\\Icon.tga",
         OnClick = function(_, mouseButton)
             if mouseButton == "RightButton" then
-                ns.db.bars.locked = not ns.db.bars.locked
-                ns.Bars_UpdateLock()
-                print(ns.BRAND .. ": " ..
-                    (ns.db.bars.locked and ns.L.msgBarsLocked or ns.L.msgBarsUnlocked))
+                ToggleLock()
             else
                 ns.OpenConfig()
             end
@@ -135,10 +145,7 @@ function ns.Minimap_Init()
 
     button:SetScript("OnClick", function(_, mouseButton)
         if mouseButton == "RightButton" then
-            ns.db.bars.locked = not ns.db.bars.locked
-            ns.Bars_UpdateLock()
-            print(ns.BRAND .. ": " ..
-                (ns.db.bars.locked and ns.L.msgBarsLocked or ns.L.msgBarsUnlocked))
+            ToggleLock()
         else
             ns.OpenConfig()
         end

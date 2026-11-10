@@ -174,6 +174,7 @@ local defaults = {
     selfbar = {
         enabled       = false,
         locked        = false,
+        display       = "icons",  -- "icons" or "bars" (bars look like the Bars page)
         size          = 36,
         spacing       = 4,
         maxIcons      = 8,

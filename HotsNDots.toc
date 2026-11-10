@@ -2,7 +2,7 @@
 ## Title: |cff33ff99HotsNDots|r
 ## Notes: Shows only YOUR own DoTs (on enemies) and HoTs/buffs (on friends) - large on nameplates with a seconds countdown, and as freely movable bars.
 ## Author: Florian
-## Version: 1.6.0
+## Version: 1.6.1
 ## SavedVariables: HotsNDotsDB
 ## IconTexture: Interface\AddOns\HotsNDots\Icon.tga
 ## AddonCompartmentFunc: HotsNDots_OnCompartmentClick

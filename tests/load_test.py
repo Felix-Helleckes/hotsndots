@@ -480,6 +480,25 @@ step(lua, "/hnd debug", 'SlashCmdList["HOTSNDOTS"]("debug")')
 printed = " ".join(list(lua.globals().PRINTED.values()))
 check("/hnd debug reports it", "self bar" in printed)
 
+# 1.6.1: the same auras as bars, built by the Bars.lua row code.
+check("the bar look has its own aura group", "AddAuraGroup:selfbars" in calls, calls)
+check("it watches the player too",
+      lua.eval("NS.selfBarContainer and NS.selfBarContainer.__unit") == "player")
+check("icons are the default look", lua.eval("NS.db.selfbar.display") == "icons")
+step(lua, "switch to bars", 'NS.db.selfbar.display = "bars"; NS.SelfBar_Update()')
+step(lua, "a bars-page restyle reaches it", "NS.Bars_Restyle()")
+step(lua, "a full restyle as bars", "NS.SelfBar_Restyle()")
+step(lua, "back to icons", 'NS.db.selfbar.display = "icons"; NS.SelfBar_Update()')
+
+# Right-click on the minimap button used to unlock only the bars.
+step(lua, "minimap right-click", """
+    for _, f in ipairs(FRAMES) do
+        if f.__name == "HotsNDotsMinimapButton" then f.__scripts.OnClick(f, "RightButton") end
+    end
+""")
+check("right-click unlocks the self bar as well", lua.eval("NS.db.selfbar.locked") is False)
+check("together with the bars", lua.eval("NS.db.bars.locked") is False)
+
 # The setting is per profile, so each profile has its own row on/off and
 # its own position - a new profile starts from the defaults.
 step(lua, "a second profile", 'NS.Profiles_Create("Heal"); NS.Profiles_AssignCurrentSpec("Heal")')

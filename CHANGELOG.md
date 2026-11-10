@@ -1,5 +1,16 @@
 # HotsNDots – Changelog
 
+## 1.6.1
+- **"Your own HoTs" can now also be shown as bars.** Tick "Show as bars" on
+  the Your own HoTs page: the same auras then appear as a column of bars that
+  look exactly like the HoT bars from "Bar style" (width, height, texture,
+  font, colour). Switching works any time, even in combat.
+- **Fixed: the row could not be moved.** Once a HoT was on you, the first icon
+  covered the drag handle. The handle now sits above the icons and is larger
+  (icon plus label).
+- **Right-click on the minimap button now unlocks the "Your own HoTs" row as
+  well**, not only the bars – the same as `/hnd unlock`.
+
 ## 1.6.0
 - **New: "Your own HoTs" – a second display for your HoTs and buffs on
   YOURSELF.** A movable row of icons in the style of Blizzard's cooldown

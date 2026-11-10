@@ -333,6 +333,9 @@ function ns.Bars_Restyle()
     end)
 
     ApplyLayout()
+
+    -- The bar look of "Your own HoTs" is built from these same settings.
+    if ns.SelfBar_RestyleBars then ns.SelfBar_RestyleBars() end
 end
 
 --------------------------------------------------------------------
