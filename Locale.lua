@@ -242,7 +242,7 @@ translations.deDE = {
     pageSelf         = "Eigene HoTs",
     selfIntro        = "Deine eigenen HoTs und Buffs AUF DIR SELBST, als verschiebbare Symbolreihe im Stil von Blizzards Abklingzeitenmanager:"
                     .. " Symbol, Ablauf-Animation und die Sekunden in der Mitte. Nutzt dieselben Filter wie alles andere"
-                    .. " (\"Buffs ohne Laufzeit ausblenden\" hält deine dauerhaften Raidbuffs heraus).",
+                    .. " (\"Buffs ohne Zeitangabe ausblenden\" hält deine dauerhaften Raidbuffs heraus).",
     cbSelf           = "Reihe der eigenen HoTs anzeigen",
     cbSelfLock       = "Reihe sperren (nicht verschiebbar)",
     cbSelfAsBars     = "Als Balken anzeigen (Optik aus \"Leisten-Stil\")",
