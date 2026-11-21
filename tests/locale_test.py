@@ -70,8 +70,8 @@ locales = sorted(dict(tables).keys())
 print("English base: %d keys" % len(EN))
 print("translations: " + ", ".join(locales))
 
-check("all four languages are present",
-      set(["deDE", "frFR", "esES", "esMX"]) <= set(locales), locales)
+check("all supported languages are present",
+      set(["deDE", "frFR", "esES", "esMX", "itIT", "ptBR", "ruRU", "koKR", "zhCN", "zhTW"]) <= set(locales), locales)
 check("esMX and esES are the same table (they cannot drift apart)",
       lua.eval("NS.localeTables.esMX == NS.localeTables.esES"))
 
@@ -108,7 +108,7 @@ check("an unknown key returns its own name instead of nil",
       lua.eval('NS.L.thisKeyDoesNotExist') == "thisKeyDoesNotExist",
       lua.eval("NS.L.thisKeyDoesNotExist"))
 
-lua = load("ptBR")
+lua = load("enGB")
 check("an unsupported client language gets English",
       lua.eval("NS.L.hdrFilters") == "Filters", lua.eval("NS.L.hdrFilters"))
 

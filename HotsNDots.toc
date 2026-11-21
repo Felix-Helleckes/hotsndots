@@ -1,8 +1,18 @@
 ## Interface: 120100, 120105, 16001
 ## Title: |cff33ff99HotsNDots|r
 ## Notes: Shows only YOUR own DoTs (on enemies) and HoTs/buffs (on friends) - large on nameplates with a seconds countdown, and as freely movable bars.
+## Notes-deDE: Zeigt nur DEINE eigenen DoTs (auf Gegnern) und HoTs/Buffs (auf Verbündeten) - groß auf den Namensplaketten mit Sekunden-Countdown und als frei verschiebbare Leisten.
+## Notes-frFR: N'affiche que VOS propres DoT (sur les ennemis) et HoT/améliorations (sur les alliés) - en grand sur les plaques de nom avec un compte à rebours, et en barres librement déplaçables.
+## Notes-esES: Muestra solo TUS propios DoT (en enemigos) y HoT/beneficios (en aliados): grandes en las placas de nombre con cuenta atrás en segundos y como barras que puedes mover libremente.
+## Notes-esMX: Muestra solo TUS propios DoT (en enemigos) y HoT/beneficios (en aliados): grandes en las placas de nombre con cuenta atrás en segundos y como barras que puedes mover libremente.
+## Notes-itIT: Mostra solo i TUOI DoT (sui nemici) e HoT/benefici (sugli alleati) - grandi sulle barre dei nomi con il conto alla rovescia in secondi, e come barre spostabili liberamente.
+## Notes-ptBR: Mostra apenas os SEUS próprios DoTs (em inimigos) e HoTs/bônus (em aliados) - grandes nas placas de identificação com contagem regressiva em segundos, e como barras que você pode mover livremente.
+## Notes-ruRU: Показывает только ВАШИ собственные DoT (на врагах) и HoT/баффы (на союзниках) - крупно на индикаторах здоровья с обратным отсчётом в секундах и в виде свободно перемещаемых полос.
+## Notes-koKR: 내가 건 DoT(적)와 HoT/강화 효과(아군)만 표시합니다 - 이름표에 초 단위 카운트다운으로 크게, 그리고 자유롭게 옮길 수 있는 바로.
+## Notes-zhCN: 只显示你自己的 DoT（敌人身上）和 HoT/增益（友方身上）- 在姓名板上以秒数倒计时大字显示，并可作为自由移动的计时条。
+## Notes-zhTW: 只顯示你自己的 DoT（敵人身上）和 HoT/增益（友方身上）- 在名條上以秒數倒數大字顯示，並可作為自由移動的計時條。
 ## Author: Florian
-## Version: 1.6.1
+## Version: 1.7.0
 ## SavedVariables: HotsNDotsDB
 ## IconTexture: Interface\AddOns\HotsNDots\Icon.tga
 ## AddonCompartmentFunc: HotsNDots_OnCompartmentClick

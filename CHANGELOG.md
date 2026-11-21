@@ -1,5 +1,12 @@
 # HotsNDots – Changelog
 
+## 1.7.0
+- **Now in every WoW client language.** Italian, Portuguese (BR), Russian,
+  Korean, Simplified and Traditional Chinese join English, German, French and
+  Spanish (EU and Latin America). HotsNDots follows your client language
+  automatically – nothing to set.
+- The AddOn list description is translated as well.
+
 ## 1.6.1
 - **"Your own HoTs" can now also be shown as bars.** Tick "Show as bars" on
   the Your own HoTs page: the same auras then appear as a column of bars that

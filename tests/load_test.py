@@ -362,7 +362,9 @@ check("/hnd debug repeats it", "last failure" in printed)
 print("\n7. the same login in every supported language")
 for locale, expect in [("deDE", "Filter"), ("frFR", "Filtres"),
                        ("esES", "Filtros"), ("esMX", "Filtros"),
-                       ("ptBR", "Filters")]:
+                       ("itIT", None), ("ptBR", None), ("ruRU", None),
+                       ("koKR", None), ("zhCN", None), ("zhTW", None),
+                       ("enGB", "Filters")]:
     print("  -- " + locale)
     lua = lupa_mod.LuaRuntime(unpack_returned_tuples=True)
     lua.globals().ADDON = ADDON
@@ -375,8 +377,10 @@ for locale, expect in [("deDE", "Filter"), ("frFR", "Filtres"),
               'fire("ADDON_LOADED", "HotsNDots"); fire("PLAYER_LOGIN")')
     if not ok:
         continue
+    if expect is None:  # the label comes from that locale's own table
+        expect = lua.eval("NS.localeTables.%s and NS.localeTables.%s.hdrFilters" % (locale, locale))
     check(locale + ": the UI speaks that language",
-          lua.eval("NS.L.hdrFilters") == expect, lua.eval("NS.L.hdrFilters"))
+          expect and lua.eval("NS.L.hdrFilters") == expect, lua.eval("NS.L.hdrFilters"))
     for cmd in ["lock", "unlock", "bars", "nameplates", "minimap",
                 "profiles", "profile", "newprofile Raid", "profile Raid",
                 "profile Nope", "debug"]:
