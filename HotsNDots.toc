@@ -11,7 +11,8 @@
 ## Notes-koKR: 내가 건 DoT(적)와 HoT/강화 효과(아군)만 표시합니다 - 이름표에 초 단위 카운트다운으로 크게, 그리고 자유롭게 옮길 수 있는 바로.
 ## Notes-zhCN: 只显示你自己的 DoT（敌人身上）和 HoT/增益（友方身上）- 在姓名板上以秒数倒计时大字显示，并可作为自由移动的计时条。
 ## Notes-zhTW: 只顯示你自己的 DoT（敵人身上）和 HoT/增益（友方身上）- 在名條上以秒數倒數大字顯示，並可作為自由移動的計時條。
-## Author: Florian
+## Author: Felix Helleckes
+## X-Author-Website: https://felix-helleckes.github.io
 ## Version: 1.7.0
 ## SavedVariables: HotsNDotsDB
 ## IconTexture: Interface\AddOns\HotsNDots\Icon.tga

@@ -127,3 +127,8 @@ its ongoing maintenance through the optional **Donate** link on the
 [HotsNDots CurseForge project page](https://www.curseforge.com/wow/addons/hotsndots).
 Donations are never requested in-game and do not unlock or restrict any addon
 functionality.
+
+---
+
+Made by **Felix Helleckes** - more addons and projects: https://felix-helleckes.github.io
+
