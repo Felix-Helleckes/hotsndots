@@ -6,3 +6,4 @@ HotsNDots.zip
 *.tmp
 Thumbs.db
 .DS_Store
+.upload-tmp/

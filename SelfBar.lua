@@ -1,6 +1,7 @@
 --=====================================================================
 --  HotsNDots - Self bar ("Your own HoTs")
---  Your own HoTs and buffs ON YOURSELF, in one of two looks:
+--  Your own HoTs and buffs ON YOURSELF - and, if wanted, every debuff
+--  on you (red frame / DoT colour) right after them - in one of two looks:
 --    icons - a row in the style of Blizzard's cooldown manager: icon,
 --            cooldown swipe, the seconds in the middle, stacks in the
 --            corner
@@ -26,8 +27,28 @@ local barStyles  = {}  -- every bar row we built
 
 local ICON_GROUP = { key = "self",     kind = "HELPFUL" }
 local BAR_GROUP  = { key = "selfbars", kind = "HELPFUL" }
--- What a self bar row colours itself by: the HoT colour of the bars page.
-local BAR_COLOR_GROUP = { key = "hots", kind = "HELPFUL", r = 0.15, g = 0.60, b = 0.25 }
+-- Debuffs on you: a second group in the same containers, after the buffs.
+-- Unlike everything else in the addon these are NOT limited to your own
+-- casts - a debuff on you matters whoever put it there.
+local ICON_DEBUFF_GROUP = { key = "selfdebuffs",    kind = "HARMFUL" }
+local BAR_DEBUFF_GROUP  = { key = "selfbardebuffs", kind = "HARMFUL" }
+-- What a self bar row colours itself by: the HoT / DoT colour of the bars page.
+local BAR_COLOR_GROUP  = { key = "hots", kind = "HELPFUL", r = 0.15, g = 0.60, b = 0.25 }
+local BAR_DEBUFF_COLOR = { key = "dots", kind = "HARMFUL", r = 0.70, g = 0.15, b = 0.15 }
+
+local function DebuffFilter()
+    local filter = "HARMFUL"
+    if ns.db and ns.db.filters and ns.db.filters.hideCrowdControl then
+        filter = filter .. "|!CROWD_CONTROL"
+    end
+    return filter
+end
+
+local function DebuffMax()
+    local cfg = ns.db.selfbar
+    -- aura groups can't be removed, so "off" is "may fill zero frames"
+    return cfg.showDebuffs and cfg.maxIcons or 0
+end
 
 local function AsBars()
     return ns.db.selfbar.display == "bars"
@@ -46,16 +67,21 @@ local function ApplyIconStyle(style)
     ns.SetFont(style.count, cfg.stackFontSize)
 end
 
-local function BuildIcon(button)
+local function BuildIcon(button, debuff)
     local cfg = ns.db.selfbar
-    local style = { button = button }
+    local style = { button = button, debuff = debuff }
 
     button:EnableMouse(false)
 
     style.border = button:CreateTexture(nil, "BACKGROUND")
     style.border:SetPoint("TOPLEFT", -1.5, 1.5)
     style.border:SetPoint("BOTTOMRIGHT", 1.5, -1.5)
-    style.border:SetColorTexture(0, 0, 0, 1)
+    -- debuffs get a red frame so they never read as one of your HoTs
+    if debuff then
+        style.border:SetColorTexture(0.80, 0.10, 0.10, 1)
+    else
+        style.border:SetColorTexture(0, 0, 0, 1)
+    end
 
     style.icon = button:CreateTexture(nil, "ARTWORK")
     style.icon:SetAllPoints()
@@ -108,9 +134,9 @@ end
 --  Built from the very same code as the rows on the "Bars" page, so the
 --  two can never look different.
 --------------------------------------------------------------------
-local function BuildBar(button)
+local function BuildBar(button, debuff)
     local cfg = ns.db.selfbar
-    local style = ns.Bars_CreateRow(button, BAR_COLOR_GROUP)
+    local style = ns.Bars_CreateRow(button, debuff and BAR_DEBUFF_COLOR or BAR_COLOR_GROUP)
 
     button:EnableMouse(false)
 
@@ -139,11 +165,16 @@ local function GroupLayout(w, h)
     return { elementSpacing = ns.db.selfbar.spacing, elementWidth = w, elementHeight = h }
 end
 
-local function ApplyFilters(container, key)
+local function ApplyFilters(container, key, debuffKey)
     local cfg = ns.db.selfbar
     container:SetAuraGroupMaxFrameCount(key, cfg.maxIcons)
     container:SetAuraGroupFilterString(key, ns.FilterString("HELPFUL"))
     container:SetAuraGroupCandidateFilters(key, ns.CandidateFilters("HELPFUL"))
+    if debuffKey then
+        container:SetAuraGroupMaxFrameCount(debuffKey, DebuffMax())
+        container:SetAuraGroupFilterString(debuffKey, DebuffFilter())
+        container:SetAuraGroupCandidateFilters(debuffKey, ns.CandidateFilters("HARMFUL"))
+    end
 end
 
 local function ApplyLayout()
@@ -169,7 +200,8 @@ local function ApplyLayout()
         iconContainer:SetFlowLayoutGrowthDirection(ns.FlowDir.Right, ns.FlowDir.Down)
     end
     iconContainer:SetAuraGroupLayout(ICON_GROUP.key, GroupLayout(cfg.size, cfg.size))
-    ApplyFilters(iconContainer, ICON_GROUP.key)
+    iconContainer:SetAuraGroupLayout(ICON_DEBUFF_GROUP.key, GroupLayout(cfg.size, cfg.size))
+    ApplyFilters(iconContainer, ICON_GROUP.key, ICON_DEBUFF_GROUP.key)
     iconContainer:SetEnabled((cfg.enabled and not bars) and true or false)
 
     -- bars: one column, downwards
@@ -179,7 +211,8 @@ local function ApplyLayout()
         barContainer:SetFlowLayoutAnchorPoint("TOPLEFT")
         barContainer:SetFlowLayoutGrowthDirection(ns.FlowDir.Right, ns.FlowDir.Down)
         barContainer:SetAuraGroupLayout(BAR_GROUP.key, GroupLayout(ns.db.bars.width, ns.db.bars.height))
-        ApplyFilters(barContainer, BAR_GROUP.key)
+        barContainer:SetAuraGroupLayout(BAR_DEBUFF_GROUP.key, GroupLayout(ns.db.bars.width, ns.db.bars.height))
+        ApplyFilters(barContainer, BAR_GROUP.key, BAR_DEBUFF_GROUP.key)
         barContainer:SetEnabled((cfg.enabled and bars) and true or false)
     end
 end
@@ -278,7 +311,7 @@ end
 --------------------------------------------------------------------
 -- Init
 --------------------------------------------------------------------
-local function NewContainer(axis, key, initializeFrame, w, h)
+local function NewContainer(axis, key, debuffKey, build, w, h)
     local cfg = ns.db.selfbar
     local c = CreateFrame("AuraContainer", nil, anchor, "CustomAuraContainerTemplate")
     c:SetFlowLayoutAxis(axis)
@@ -288,7 +321,16 @@ local function NewContainer(axis, key, initializeFrame, w, h)
         candidateFilters = ns.CandidateFilters("HELPFUL"),
         sortMethod       = ns.SortMethod.ExpirationOnly,
         sortDirection    = ns.SortDirection.Normal,
-        initializeFrame  = initializeFrame,
+        initializeFrame  = function(button) build(button, false) end,
+        layout           = GroupLayout(w, h),
+    })
+    -- second group: debuffs on you, laid out after the buffs
+    c:AddAuraGroup(debuffKey, DebuffFilter(), {
+        maxFrameCount    = DebuffMax(),
+        candidateFilters = ns.CandidateFilters("HARMFUL"),
+        sortMethod       = ns.SortMethod.ExpirationOnly,
+        sortDirection    = ns.SortDirection.Normal,
+        initializeFrame  = function(button) build(button, true) end,
         layout           = GroupLayout(w, h),
     })
     return c
@@ -334,16 +376,16 @@ function ns.SelfBar_Init()
     anchor.label:SetPoint("TOPLEFT", handle, "TOPLEFT", 2, -2)
     anchor.label:SetText(ns.L.selfAnchorLabel)
 
-    iconContainer = NewContainer(ns.FlowAxis.Horizontal, ICON_GROUP.key, BuildIcon,
-        cfg.size, cfg.size)
+    iconContainer = NewContainer(ns.FlowAxis.Horizontal, ICON_GROUP.key, ICON_DEBUFF_GROUP.key,
+        BuildIcon, cfg.size, cfg.size)
     ns.selfContainer = iconContainer
     iconContainer:SetUnit("player")
 
     -- The bar look borrows its rows from Bars.lua. Should that file be
     -- missing (see Core.lua), the icons keep working on their own.
     if ns.Bars_CreateRow and ns.Bars_ApplyRowStyle then
-        barContainer = NewContainer(ns.FlowAxis.Vertical, BAR_GROUP.key, BuildBar,
-            ns.db.bars.width, ns.db.bars.height)
+        barContainer = NewContainer(ns.FlowAxis.Vertical, BAR_GROUP.key, BAR_DEBUFF_GROUP.key,
+            BuildBar, ns.db.bars.width, ns.db.bars.height)
         ns.selfBarContainer = barContainer
         barContainer:SetUnit("player")
     end

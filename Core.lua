@@ -183,6 +183,7 @@ local defaults = {
         stackFontSize = 12,
         showStacks    = true,  -- only ever shows real stacks (2+)
         showSwipe     = true,
+        showDebuffs   = true,  -- debuffs on you (any source) after your buffs
         point         = { point = "CENTER", relPoint = "CENTER", x = 0, y = -180 },
     },
 

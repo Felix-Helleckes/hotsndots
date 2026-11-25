@@ -13,7 +13,7 @@
 ## Notes-zhTW: 只顯示你自己的 DoT（敵人身上）和 HoT/增益（友方身上）- 在名條上以秒數倒數大字顯示，並可作為自由移動的計時條。
 ## Author: Felix Helleckes
 ## X-Author-Website: https://felix-helleckes.github.io
-## Version: 1.7.0
+## Version: 1.8.0
 ## SavedVariables: HotsNDotsDB
 ## IconTexture: Interface\AddOns\HotsNDots\Icon.tga
 ## AddonCompartmentFunc: HotsNDots_OnCompartmentClick

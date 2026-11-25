@@ -1,5 +1,14 @@
 # HotsNDots – Changelog
 
+## 1.8.0
+- **Debuffs on you in "Your own HoTs".** Asked for in the comments: the row now
+  also shows every debuff on you – boss mechanics, DoTs from enemies, anything
+  – right after your own HoTs. Debuffs get a red frame (icons) or the DoT colour
+  (bars), so they never read as one of your HoTs. Works in combat like the rest.
+- New switch on the Your own HoTs page: "Also show debuffs on you (any source)",
+  on by default. "Hide crowd control" and "hide debuffs without a timer" from the
+  Filters page apply here too.
+- Translated into all 11 client languages.
 ## 1.7.0
 - **Now in every WoW client language.** Italian, Portuguese (BR), Russian,
   Korean, Simplified and Traditional Chinese join English, German, French and

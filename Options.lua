@@ -877,6 +877,10 @@ function ns.Options_BuildSelfPanel()
         function() return ns.db.selfbar.display == "bars" end,
         function(v) ns.db.selfbar.display = v and "bars" or "icons"; UpdateSelf() end)
 
+    CreateCheckbox(panel, L.cbSelfDebuffs, 300, -150,
+        function() return ns.db.selfbar.showDebuffs end,
+        function(v) ns.db.selfbar.showDebuffs = v; UpdateSelf() end)
+
     CreateCheckbox(panel, L.cbGrowLeft, 24, -176,
         function() return ns.db.selfbar.growLeft end,
         function(v) ns.db.selfbar.growLeft = v; UpdateSelf() end)

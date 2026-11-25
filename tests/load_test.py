@@ -99,8 +99,13 @@ function CreateFrame(kind, name, parent, template)
         -- Core probes for these two BY TYPE ("function"), which is how it
         -- decides whether this client can show auras at all.
         f.SetUnit = function(self, unit) self.__unit = unit; return self end
+        f.__max, f.__filter = {}, {}
+        f.SetAuraGroupMaxFrameCount = function(self, key, n) self.__max[key] = n end
+        f.SetAuraGroupFilterString  = function(self, key, s) self.__filter[key] = s end
         f.AddAuraGroup = function(self, key, filter, opts)
             CALLS[#CALLS + 1] = "AddAuraGroup:" .. tostring(key)
+            self.__filter[key] = filter
+            self.__max[key] = opts and opts.maxFrameCount
             if opts and opts.initializeFrame then
                 opts.initializeFrame(CreateFrame("Button", nil, self))
             end
@@ -493,6 +498,23 @@ step(lua, "switch to bars", 'NS.db.selfbar.display = "bars"; NS.SelfBar_Update()
 step(lua, "a bars-page restyle reaches it", "NS.Bars_Restyle()")
 step(lua, "a full restyle as bars", "NS.SelfBar_Restyle()")
 step(lua, "back to icons", 'NS.db.selfbar.display = "icons"; NS.SelfBar_Update()')
+
+# 1.8.0: debuffs on you (a user request) - a second group in both looks.
+check("the icon row has a debuff group", "AddAuraGroup:selfdebuffs" in calls, calls)
+check("the bar look has a debuff group", "AddAuraGroup:selfbardebuffs" in calls, calls)
+check("debuffs are on by default", lua.eval("NS.db.selfbar.showDebuffs") is True)
+flt = lua.eval('NS.selfContainer.__filter["selfdebuffs"]')
+check("debuffs from ANY source (no |PLAYER)", flt and flt.startswith("HARMFUL") and "PLAYER" not in flt, flt)
+check("buffs stay your own (|PLAYER)", "PLAYER" in (lua.eval('NS.selfContainer.__filter["self"]') or ""))
+check("debuff group uses the max icons",
+      lua.eval('NS.selfContainer.__max["selfdebuffs"] == NS.db.selfbar.maxIcons'))
+step(lua, "switch debuffs off", "NS.db.selfbar.showDebuffs = false; NS.SelfBar_Update()")
+check("off means zero frames (icons)", lua.eval('NS.selfContainer.__max["selfdebuffs"]') == 0)
+check("off means zero frames (bars)", lua.eval('NS.selfBarContainer.__max["selfbardebuffs"]') == 0)
+check("buffs are untouched", lua.eval('NS.selfContainer.__max["self"] == NS.db.selfbar.maxIcons'))
+step(lua, "and on again", "NS.db.selfbar.showDebuffs = true; NS.SelfBar_Update()")
+check("on again restores them", lua.eval('NS.selfContainer.__max["selfdebuffs"] == NS.db.selfbar.maxIcons'))
+step(lua, "a restyle with debuffs", "NS.SelfBar_Restyle()")
 
 # Right-click on the minimap button used to unlock only the bars.
 step(lua, "minimap right-click", """
