@@ -435,12 +435,18 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
     end
 end)
 
-eventFrame:RegisterEvent("ADDON_LOADED")
-eventFrame:RegisterEvent("PLAYER_LOGIN")
-eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-eventFrame:RegisterEvent("PLAYER_FOCUS_CHANGED")
-eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-eventFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+-- WoW Forever throws on events its client doesn't know, and new builds
+-- drop events now and then: one unknown event must never stop the whole
+-- addon from loading.
+local function SafeRegister(frame, event)
+    return (pcall(frame.RegisterEvent, frame, event))
+end
+SafeRegister(eventFrame, "ADDON_LOADED")
+SafeRegister(eventFrame, "PLAYER_LOGIN")
+SafeRegister(eventFrame, "PLAYER_REGEN_ENABLED")
+SafeRegister(eventFrame, "PLAYER_ENTERING_WORLD")
+SafeRegister(eventFrame, "PLAYER_SPECIALIZATION_CHANGED")
+SafeRegister(eventFrame, "PLAYER_TARGET_CHANGED")
+SafeRegister(eventFrame, "PLAYER_FOCUS_CHANGED")
+SafeRegister(eventFrame, "NAME_PLATE_UNIT_ADDED")
+SafeRegister(eventFrame, "NAME_PLATE_UNIT_REMOVED")

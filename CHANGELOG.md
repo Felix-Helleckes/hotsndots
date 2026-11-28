@@ -1,5 +1,8 @@
 # HotsNDots – Changelog
 
+## 1.8.1
+- Safer loading: if a WoW client update ever drops one of the events HotsNDots listens to, the addon now keeps working instead of failing to load. Nothing changes for you today; this is a precaution after a recent WoW Forever build removed an event other addons relied on.
+
 ## 1.8.0
 - **Debuffs on you in "Your own HoTs".** Asked for in the comments: the row now
   also shows every debuff on you – boss mechanics, DoTs from enemies, anything
